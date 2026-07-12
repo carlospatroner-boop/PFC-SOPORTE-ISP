@@ -1,0 +1,55 @@
+version: '3.9'
+
+# Cluster CockroachDB de 3 nodos para el PFC — equipo ACC (Soporte Técnico ISP)
+# Uso:
+#   docker compose -f docker-compose.cockroach.yml up -d
+#   docker exec -it roach1 cockroach init --insecure   (una sola vez, para inicializar el cluster)
+# Consola web: http://localhost:8080
+
+networks:
+  soporte-net:
+    name: soporte-net
+    driver: bridge
+
+volumes:
+  roach1-data: {}
+  roach2-data: {}
+  roach3-data: {}
+
+services:
+  roach1:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: roach1
+    hostname: roach1
+    # locality simula 3 zonas operativas del ISP; sustenta la politica de replicacion por localidad
+    command: start --insecure --locality=zone=quevedo-centro --join=roach1,roach2,roach3
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - roach1-data:/cockroach/cockroach-data
+    networks: [soporte-net]
+
+  roach2:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: roach2
+    hostname: roach2
+    command: start --insecure --locality=zone=quevedo-norte --join=roach1,roach2,roach3
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    volumes:
+      - roach2-data:/cockroach/cockroach-data
+    networks: [soporte-net]
+
+  roach3:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: roach3
+    hostname: roach3
+    command: start --insecure --locality=zone=quevedo-sur --join=roach1,roach2,roach3
+    ports:
+      - "26259:26257"
+      - "8082:8080"
+    volumes:
+      - roach3-data:/cockroach/cockroach-data
+    networks: [soporte-net]

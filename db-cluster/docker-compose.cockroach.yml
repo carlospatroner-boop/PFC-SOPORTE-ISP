@@ -1,10 +1,14 @@
-version: '3.9'
-
 # Cluster CockroachDB de 3 nodos para el PFC — equipo ACC (Soporte Técnico ISP)
 # Uso:
 #   docker compose -f docker-compose.cockroach.yml up -d
 #   docker exec -it roach1 cockroach init --insecure   (una sola vez, para inicializar el cluster)
-# Consola web: http://localhost:8080
+# Consola web: http://localhost:8083
+# Nota: el dashboard de roach1 se mapea a 8083 (no 8080) porque el 8080 local
+# esta ocupado por un servicio Jenkins ajeno a este proyecto.
+# Nota: --max-offset=4500ms (default 500ms) porque en este entorno de desarrollo
+# (WSL2/Docker Desktop en Windows) el reloj de la VM se desincroniza unos
+# segundos tras cada suspension del host y CockroachDB rechaza arrancar si
+# detecta mas desfase que max-offset. No usar este valor en un cluster real.
 
 networks:
   soporte-net:
@@ -22,34 +26,55 @@ services:
     container_name: roach1
     hostname: roach1
     # locality simula 3 zonas operativas del ISP; sustenta la politica de replicacion por localidad
-    command: start --insecure --locality=zone=quevedo-centro --join=roach1,roach2,roach3
+    command: start --insecure --max-offset=4500ms --locality=zone=quevedo-centro --join=roach1,roach2,roach3
     ports:
       - "26257:26257"
-      - "8080:8080"
+      - "8083:8080"
     volumes:
       - roach1-data:/cockroach/cockroach-data
     networks: [soporte-net]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   roach2:
     image: cockroachdb/cockroach:latest-v23.2
     container_name: roach2
     hostname: roach2
-    command: start --insecure --locality=zone=quevedo-norte --join=roach1,roach2,roach3
+    command: start --insecure --max-offset=4500ms --locality=zone=quevedo-norte --join=roach1,roach2,roach3
     ports:
       - "26258:26257"
       - "8081:8080"
     volumes:
       - roach2-data:/cockroach/cockroach-data
     networks: [soporte-net]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   roach3:
     image: cockroachdb/cockroach:latest-v23.2
     container_name: roach3
     hostname: roach3
-    command: start --insecure --locality=zone=quevedo-sur --join=roach1,roach2,roach3
+    command: start --insecure --max-offset=4500ms --locality=zone=quevedo-sur --join=roach1,roach2,roach3
     ports:
       - "26259:26257"
       - "8082:8080"
     volumes:
       - roach3-data:/cockroach/cockroach-data
     networks: [soporte-net]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s

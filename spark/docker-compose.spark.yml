@@ -1,0 +1,28 @@
+# Corre el pipeline de Spark dentro de un contenedor Linux, igual en Windows/Mac/Linux.
+# Requiere el cluster de db-cluster/ ya levantado (comparte la red "soporte-net").
+#
+# Uso (desde esta carpeta, spark/):
+#   docker compose -f docker-compose.spark.yml build
+#   docker compose -f docker-compose.spark.yml run --rm spark generate_dataset.py --rows 600000 --out ../data/processed/incidents
+#   docker compose -f docker-compose.spark.yml run --rm spark pipeline.py --data ../data/processed/incidents --master "local[4]"
+#   docker compose -f docker-compose.spark.yml run --rm spark amdahl_analysis.py --data ../data/processed/incidents --results-dir ../results
+#
+# Nota sobre el paso 3 (medir N=8): asignar al menos 8 vCPUs a Docker Desktop
+# (Settings > Resources) para que el punto N=8 de Amdahl sea representativo.
+
+services:
+  spark:
+    build: .
+    image: acc-soporte-spark:latest
+    working_dir: /app/src
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./results:/app/results
+      - ./notebooks:/app/notebooks
+    networks:
+      - soporte-net
+
+networks:
+  soporte-net:
+    external: true

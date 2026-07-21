@@ -1,0 +1,81 @@
+SET
+info
+planning time: 289µs
+execution time: 3ms
+distribution: local
+vectorized: true
+plan type: generic, reused
+rows decoded from KV: 2 (322 B, 2 gRPC calls)
+cumulative time spent in KV: 3ms
+maximum memory usage: 100 KiB
+network usage: 0 B (0 messages)
+sql cpu time: 188µs
+isolation level: serializable
+priority: normal
+quality of service: regular
+
+• lookup join (streamer)
+│ nodes: n1
+│ actual row count: 1
+│ KV time: 1ms
+│ KV contention time: 0µs
+│ KV rows decoded: 1
+│ KV bytes read: 152 B
+│ KV gRPC calls: 1
+│ estimated max memory allocated: 40 KiB
+│ sql cpu time: 159µs
+│ estimated row count: 1
+│ table: tickets@tickets_pkey
+│ equality: (lookup_join_const_col_@1, id) = (zone, id)
+│ equality cols are key
+│
+└── • render
+"    │"
+"    └── • scan"
+"          nodes: n1"
+"          actual row count: 1"
+"          KV time: 1ms"
+"          KV contention time: 0µs"
+"          KV rows decoded: 1"
+"          KV bytes read: 170 B"
+"          KV gRPC calls: 1"
+"          estimated max memory allocated: 20 KiB"
+"          sql cpu time: 29µs"
+"          estimated row count: 1 (<0.01% of the table; stats collected 1 minute ago)"
+"          table: tickets@tickets_pkey"
+"          spans: [/'QUEVEDO_NORTE' - /'QUEVEDO_NORTE']"
+"          limit: 1"
+info
+planning time: 859µs
+execution time: 7ms
+distribution: local
+vectorized: true
+plan type: custom
+rows decoded from KV: 1,004 (88 KiB, 2 gRPC calls)
+cumulative time spent in KV: 7ms
+maximum memory usage: 564 KiB
+network usage: 0 B (0 messages)
+sql cpu time: 1ms
+isolation level: serializable
+priority: normal
+quality of service: regular
+
+• index join
+│ estimated row count: 689
+│ table: tickets@tickets_pkey
+│
+└── • sort
+"    │ estimated row count: 226"
+"    │ order: -created_at"
+"    │"
+"    └── • filter"
+"        │ estimated row count: 226"
+"        │ filter: zone = 'QUEVEDO_SUR'"
+"        │"
+"        └── • scan"
+"              estimated row count: 740 (3.7% of the table; stats collected 1 minute ago)"
+"              table: tickets@idx_tickets_created_at"
+"              spans: [/'2026-07-17 15:20:50.912604+00'/'QUEVEDO_SUR' - ]"
+ERROR: request timestamp 1784388051.707055544,1678 too far in future (> 1784388051.707055544,1675)
+ERROR: request timestamp 1784388051.707055544,1678 too far in future (> 1784388051.707055544,1675)
+Failed running "sql"

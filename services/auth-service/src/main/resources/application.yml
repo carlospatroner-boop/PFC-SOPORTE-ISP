@@ -1,0 +1,57 @@
+server:
+  port: ${SERVER_PORT:8001}
+
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    # Por defecto apunta al primer nodo del cluster local (docker-compose.cockroach.yml).
+    # En Docker Compose del PFC, sobreescribir con la variable de entorno DB_URL.
+    url: ${DB_URL:jdbc:postgresql://localhost:26257/auth_db?sslmode=disable}
+    username: ${DB_USER:root}
+    password: ${DB_PASS:}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    # El esquema ya lo gestiona db-cluster/scripts/init_auth_db.sql.
+    # Hibernate NUNCA debe recrear ni alterar las tablas de este servicio.
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        # CockroachDB no soporta todas las extensiones del dialecto Postgres; el dialecto
+        # estandar de PostgreSQL funciona para las operaciones CRUD basicas usadas aqui.
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+auth:
+  jwt:
+    # ADVERTENCIA: este secreto por defecto es solo para desarrollo local. Cualquier
+    # despliegue compartido debe sobreescribirlo con AUTH_JWT_SECRET (minimo 32 bytes).
+    secret: ${AUTH_JWT_SECRET:dev-only-insecure-secret-please-change-me-3242}
+    access-ttl-minutes: ${AUTH_ACCESS_TTL_MINUTES:15}
+    refresh-ttl-days: ${AUTH_REFRESH_TTL_DAYS:7}
+
+admin:
+  bootstrap:
+    # Cuenta ADMIN creada automaticamente al primer arranque si no existe ninguna todavia
+    # (ver config/AdminBootstrap.java). Cambiar la contrasena por defecto en cualquier
+    # entorno compartido.
+    email: ${ADMIN_BOOTSTRAP_EMAIL:admin@soporte.local}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:Admin123!}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    ec.edu.uteq.soporte: INFO
+    org.hibernate.SQL: DEBUG

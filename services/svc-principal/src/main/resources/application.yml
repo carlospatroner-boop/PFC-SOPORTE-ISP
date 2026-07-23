@@ -1,0 +1,62 @@
+server:
+  port: 8002
+
+spring:
+  application:
+    name: ticket-service
+
+  datasource:
+    # Por defecto apunta al primer nodo del cluster local (docker-compose.cockroach.yml).
+    # En Docker Compose del PFC, sobreescribir con la variable de entorno DB_URL.
+    url: ${DB_URL:jdbc:postgresql://localhost:26257/ticket_db?sslmode=disable}
+    username: ${DB_USER:root}
+    password: ${DB_PASS:}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    # El esquema (incluyendo PARTITION BY) ya lo gestionan los scripts de db-cluster/scripts/.
+    # Hibernate NUNCA debe recrear ni alterar la tabla particionada.
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        # CockroachDB no soporta todas las extensiones del dialecto Postgres; el dialecto
+        # estandar de PostgreSQL funciona para las operaciones CRUD basicas usadas aqui.
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # JSON plano como texto (no el JsonSerializer de Spring, que agrega headers con
+    # nombres de clases Java) -- el consumidor/productor del otro lado es Python
+    # (ai-service) y no tiene por que conocer tipos Java. Cada servicio arma/parsea
+    # el JSON el mismo con su propia libreria (Jackson aqui, json en Python).
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: ticket-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+auth:
+  service:
+    # auth-service valida los access tokens (GET /validate) para cada request a
+    # /api/v1/tickets/** -- ver config/AuthGatewayFilter.java.
+    base-url: ${AUTH_SERVICE_URL:http://localhost:8001/api/v1/auth}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    ec.edu.uteq.soporte: INFO
+    org.hibernate.SQL: DEBUG

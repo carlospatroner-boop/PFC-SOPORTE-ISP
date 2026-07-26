@@ -4,8 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import ec.edu.uteq.soporte.ticketservice.domain.Category;
 import ec.edu.uteq.soporte.ticketservice.domain.Priority;
 import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
-import ec.edu.uteq.soporte.ticketservice.domain.TicketId;
-import ec.edu.uteq.soporte.ticketservice.domain.Zone;
 import ec.edu.uteq.soporte.ticketservice.event.TicketClassifiedEvent;
 import ec.edu.uteq.soporte.ticketservice.repository.TicketRepository;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -58,9 +56,8 @@ public class TicketClassificationListener {
     }
 
     private void apply(TicketClassifiedEvent event) {
-        Zone zone = Zone.valueOf(event.zone());
-        TicketId id = new TicketId(zone, UUID.fromString(event.ticketId()));
-        Ticket ticket = ticketRepository.findById(id).orElse(null);
+        UUID id = UUID.fromString(event.ticketId());
+        Ticket ticket = ticketRepository.findByTicketId(id).orElse(null);
         if (ticket == null) {
             LOGGER.warning("ticket.classified referencia un ticket inexistente: " + event.ticketId());
             return;

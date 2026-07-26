@@ -17,8 +17,10 @@ import java.util.UUID;
 
 /**
  * Contrato REST alineado con la Entrega 2 (Capitulo 7.3), con el prefijo /api/v1/.
- * La ruta de detalle incluye la zona porque forma parte de la clave primaria
- * compuesta en CockroachDB (ver ADR-0003).
+ * La ruta de detalle usa solo el id del ticket -- desde que la fragmentacion paso
+ * a ser por fecha_apertura (ver ADR-0003), la zona ya no forma parte de la clave
+ * primaria y el lookup se resuelve por el indice unico secundario sobre "id"
+ * (ver TicketRepository.findByTicketId).
  *
  * "authRole"/"authUserId"/"authZone" los pone AuthGatewayFilter tras validar el
  * access token contra auth-service; la decision de que puede hacer cada rol vive
@@ -57,36 +59,33 @@ public class TicketController {
         return ApiResponse.of(tickets, "OK");
     }
 
-    @GetMapping("/{zone}/{id}")
+    @GetMapping("/{id}")
     public ApiResponse<TicketResponse> getTicket(
-            @PathVariable Zone zone,
             @PathVariable UUID id,
             @RequestAttribute("authRole") String role,
             @RequestAttribute("authUserId") UUID userId,
             @RequestAttribute(required = false) Zone authZone) {
-        Ticket ticket = ticketService.getTicket(zone, id, role, userId, authZone);
+        Ticket ticket = ticketService.getTicket(id, role, userId, authZone);
         return ApiResponse.of(TicketResponse.from(ticket), "OK");
     }
 
-    @PatchMapping("/{zone}/{id}/status")
+    @PatchMapping("/{id}/status")
     public ApiResponse<TicketResponse> updateStatus(
-            @PathVariable Zone zone,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateStatusRequest request,
             @RequestAttribute("authRole") String role,
             @RequestAttribute(required = false) Zone authZone) {
-        Ticket updated = ticketService.updateStatus(zone, id, request.status(), role, authZone);
+        Ticket updated = ticketService.updateStatus(id, request.status(), role, authZone);
         return ApiResponse.of(TicketResponse.from(updated), "Estado actualizado");
     }
 
-    @PostMapping("/{zone}/{id}/assign")
+    @PostMapping("/{id}/assign")
     public ApiResponse<TicketResponse> assignTechnician(
-            @PathVariable Zone zone,
             @PathVariable UUID id,
             @RequestParam UUID technicianId,
             @RequestAttribute("authRole") String role,
             @RequestAttribute(required = false) Zone authZone) {
-        Ticket updated = ticketService.assignTechnician(zone, id, technicianId, role, authZone);
+        Ticket updated = ticketService.assignTechnician(id, technicianId, role, authZone);
         return ApiResponse.of(TicketResponse.from(updated), "Tecnico asignado");
     }
 }

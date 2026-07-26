@@ -1,13 +1,16 @@
 package ec.edu.uteq.soporte.ticketservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ec.edu.uteq.soporte.ticketservice.config.CrdbMetrics;
 import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
-import ec.edu.uteq.soporte.ticketservice.domain.TicketId;
 import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
 import ec.edu.uteq.soporte.ticketservice.domain.Zone;
+import ec.edu.uteq.soporte.ticketservice.event.TicketAssignedEvent;
 import ec.edu.uteq.soporte.ticketservice.event.TicketCreatedEvent;
+import ec.edu.uteq.soporte.ticketservice.event.TicketStatusChangedEvent;
 import ec.edu.uteq.soporte.ticketservice.repository.TicketRepository;
 import ec.edu.uteq.soporte.ticketservice.web.dto.CreateTicketRequest;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -41,18 +44,23 @@ public class TicketService {
     private static final String ROLE_TECNICO = "TECNICO";
     private static final String ROLE_CLIENTE = "CLIENTE";
     private static final String TOPIC_TICKET_CREATED = "ticket.created";
+    private static final String TOPIC_TICKET_STATUS_CHANGED = "ticket.status-changed";
+    private static final String TOPIC_TICKET_ASSIGNED = "ticket.assigned";
     private static final Logger LOGGER = Logger.getLogger(TicketService.class.getName());
 
     private final TicketRepository ticketRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final CrdbMetrics crdbMetrics;
 
     public TicketService(TicketRepository ticketRepository,
                           KafkaTemplate<String, String> kafkaTemplate,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          CrdbMetrics crdbMetrics) {
         this.ticketRepository = ticketRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.crdbMetrics = crdbMetrics;
     }
 
     /**
@@ -78,7 +86,7 @@ public class TicketService {
                 .slaDeadline(now.plusHours(24))
                 .slaBreached(false)
                 .build();
-        Ticket saved = ticketRepository.save(ticket);
+        Ticket saved = saveWithRetry(ticket);
         publishTicketCreated(saved);
         return saved;
     }
@@ -91,10 +99,31 @@ public class TicketService {
     private void publishTicketCreated(Ticket ticket) {
         try {
             TicketCreatedEvent event = new TicketCreatedEvent(
-                    ticket.getId().toString(), ticket.getZone().name(), ticket.getDescription());
+                    ticket.getId().toString(), ticket.getZone().name(), ticket.getClientId().toString(),
+                    ticket.getDescription(), ticket.getCreatedAt().toString());
             kafkaTemplate.send(TOPIC_TICKET_CREATED, event.ticketId(), objectMapper.writeValueAsString(event));
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "No se pudo publicar ticket.created para " + ticket.getId(), e);
+        }
+    }
+
+    private void publishTicketStatusChanged(Ticket ticket, TicketStatus oldStatus) {
+        try {
+            TicketStatusChangedEvent event = new TicketStatusChangedEvent(
+                    ticket.getId().toString(), ticket.getZone().name(), oldStatus.name(), ticket.getStatus().name());
+            kafkaTemplate.send(TOPIC_TICKET_STATUS_CHANGED, event.ticketId(), objectMapper.writeValueAsString(event));
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "No se pudo publicar ticket.status-changed para " + ticket.getId(), e);
+        }
+    }
+
+    private void publishTicketAssigned(Ticket ticket) {
+        try {
+            TicketAssignedEvent event = new TicketAssignedEvent(
+                    ticket.getId().toString(), ticket.getZone().name(), ticket.getTechnicianId().toString());
+            kafkaTemplate.send(TOPIC_TICKET_ASSIGNED, event.ticketId(), objectMapper.writeValueAsString(event));
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "No se pudo publicar ticket.assigned para " + ticket.getId(), e);
         }
     }
 
@@ -102,8 +131,8 @@ public class TicketService {
         return request.title() + " -- " + request.description();
     }
 
-    public Ticket getTicket(Zone zone, UUID id, String role, UUID userId, Zone authZone) {
-        Ticket ticket = fetchTicketOrThrow(zone, id);
+    public Ticket getTicket(UUID id, String role, UUID userId, Zone authZone) {
+        Ticket ticket = fetchTicketOrThrow(id);
         assertCanView(ticket, role, userId, authZone);
         return ticket;
     }
@@ -140,10 +169,11 @@ public class TicketService {
         return List.of();
     }
 
-    public Ticket updateStatus(Zone zone, UUID id, TicketStatus newStatus, String role, Zone authZone) {
-        Ticket ticket = fetchTicketOrThrow(zone, id);
+    public Ticket updateStatus(UUID id, TicketStatus newStatus, String role, Zone authZone) {
+        Ticket ticket = fetchTicketOrThrow(id);
         assertCanManage(ticket, role, authZone);
 
+        TicketStatus oldStatus = ticket.getStatus();
         ticket.setStatus(newStatus);
         if (newStatus == TicketStatus.RESUELTO) {
             ticket.setResolvedAt(OffsetDateTime.now());
@@ -152,21 +182,44 @@ public class TicketService {
                             && ticket.getResolvedAt().isAfter(ticket.getSlaDeadline())
             );
         }
-        return ticketRepository.save(ticket);
+        Ticket saved = saveWithRetry(ticket);
+        publishTicketStatusChanged(saved, oldStatus);
+        return saved;
     }
 
-    public Ticket assignTechnician(Zone zone, UUID id, UUID technicianId, String role, Zone authZone) {
-        Ticket ticket = fetchTicketOrThrow(zone, id);
+    public Ticket assignTechnician(UUID id, UUID technicianId, String role, Zone authZone) {
+        Ticket ticket = fetchTicketOrThrow(id);
         assertCanManage(ticket, role, authZone);
 
         ticket.setTechnicianId(technicianId);
         ticket.setStatus(TicketStatus.ASIGNADO);
-        return ticketRepository.save(ticket);
+        Ticket saved = saveWithRetry(ticket);
+        publishTicketAssigned(saved);
+        return saved;
     }
 
-    private Ticket fetchTicketOrThrow(Zone zone, UUID id) {
-        return ticketRepository.findById(new TicketId(zone, id))
-                .orElseThrow(() -> new TicketNotFoundException(zone, id));
+    // Busca por id via el indice unico secundario tickets_id_key -- ya no por la
+    // clave primaria compuesta (created_at, id), que el llamador no conoce de
+    // antemano (ver ADR-0003 y TicketRepository.findByTicketId).
+    private Ticket fetchTicketOrThrow(UUID id) {
+        return ticketRepository.findByTicketId(id)
+                .orElseThrow(() -> new TicketNotFoundException(id));
+    }
+
+    // CockroachDB usa aislamiento serializable: cualquier escritura puede abortar
+    // por un conflicto con otra transaccion concurrente (visto en vivo en
+    // report-service, ver ReportEventListener.applyWithRetry) y Spring la traduce a
+    // ConcurrencyFailureException. Se reintenta una sola vez, incrementando
+    // crdb_transaction_retries_total (D3.2) -- un segundo conflicto seguido se deja
+    // propagar en vez de reintentar indefinidamente.
+    private Ticket saveWithRetry(Ticket ticket) {
+        try {
+            return ticketRepository.save(ticket);
+        } catch (ConcurrencyFailureException e) {
+            crdbMetrics.incrementTransactionRetries();
+            LOGGER.log(Level.INFO, "Conflicto de escritura serializable para " + ticket.getId() + ", reintentando una vez", e);
+            return ticketRepository.save(ticket);
+        }
     }
 
     private void assertCanView(Ticket ticket, String role, UUID userId, Zone authZone) {

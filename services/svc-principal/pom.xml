@@ -39,6 +39,21 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Metricas Prometheus incrementales (D3.2 de la rubrica de Entrega 3):
+             crdb_query_duration_seconds, crdb_transaction_retries_total,
+             crdb_pool_active_connections. Ver config/CrdbMetrics.java. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- @Aspect para medir la duracion de cada consulta a TicketRepository sin
+             tener que instrumentar cada metodo a mano (ver config/RepositoryTimingAspect.java) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
         <!-- CockroachDB habla el protocolo de PostgreSQL: se usa el driver de postgresql -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -63,7 +78,33 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Testcontainers (D3.1 de la rubrica de Entrega 3, Modulo A paso 6): las
+             pruebas de integracion levantan un CockroachDB real en Docker en vez de
+             depender de un cluster local ya corriendo. Ver test/.../integration/. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>1.19.7</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <finalName>ticket-service</finalName>

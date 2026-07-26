@@ -51,10 +51,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # "prometheus" expone /actuator/prometheus con las metricas incrementales
+        # de D3.2 (ver config/CrdbMetrics.java) ademas de las metricas estandar de
+        # Spring Boot (JVM, HTTP, HikariCP).
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 logging:
   level:

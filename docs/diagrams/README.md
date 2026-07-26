@@ -1,17 +1,22 @@
 # docs/diagrams — Diagramas de arquitectura (C4)
 
-Acá van las imágenes exportadas desde mermaid.live (u otra herramienta), con estos nombres
-exactos según la estructura de repositorio exigida por la guía de la Entrega 3:
+Los diagramas están escritos en Mermaid, embebidos directamente en Markdown — GitHub los
+renderiza nativamente al ver el archivo, sin necesidad de exportar una imagen aparte:
 
-- `c4_l1_contexto.png` — Vista de contexto: el sistema como caja única y sus usuarios externos.
-- `c4_l2_contenedores.png` — Vista de contenedores: microservicios, bases de datos, Kafka, el
-  cluster CockroachDB. **Este es el diagrama que armamos hoy con Mermaid** (arquitectura general).
-- `c4_l3_componentes.png` — Vista de componentes: zoom a un servicio específico (por ejemplo,
-  el zoom al cluster con las 3 particiones por zona que armamos hoy).
+- [`c4-nivel2-contenedores.md`](c4-nivel2-contenedores.md) — Vista de contenedores: los 5
+  microservicios, CockroachDB, Kafka y MongoDB (arquitectura general actualizada tras la
+  Entrega 3).
+- [`c4-nivel3-particionado.md`](c4-nivel3-particionado.md) — Vista de componentes: zoom a cómo
+  `ticket-service` accede a la tabla `tickets` particionada por `fecha_apertura` en CockroachDB
+  (ver [ADR-0003](../adr/0003-sharding-policy.md)).
+- [`db-schema.md`](db-schema.md) — Diagrama entidad-relación del esquema de `ticket_db`.
 
-## Cómo generarlos
+## Para incluirlos en el documento LaTeX
+
+Los diagramas Mermaid no se pueden incrustar directamente en LaTeX. Exportar cada uno como PNG:
 
 1. Ir a https://mermaid.live
-2. Pegar el código Mermaid (los dos bloques que armamos en el chat).
-3. Exportar como PNG (botón de descarga/export en la parte superior).
-4. Guardar el archivo acá, en esta carpeta, con el nombre correspondiente de la lista de arriba.
+2. Pegar el bloque de código Mermaid del archivo `.md` correspondiente.
+3. Exportar como PNG (botón de descarga/export en la parte superior), 300 dpi si es posible.
+4. Guardar el PNG en esta misma carpeta (por ejemplo `c4-nivel2.drawio.png`) y referenciarlo desde
+   el manuscrito con `\includegraphics`.

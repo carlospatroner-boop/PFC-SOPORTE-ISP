@@ -1,6 +1,7 @@
 package ec.edu.uteq.soporte.ticketservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ec.edu.uteq.soporte.ticketservice.config.CrdbMetrics;
 import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
 import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
 import ec.edu.uteq.soporte.ticketservice.domain.Zone;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.time.OffsetDateTime;
@@ -39,11 +41,14 @@ class TicketServiceTest {
     @Mock
     private KafkaTemplate<String, String> kafkaTemplate;
 
+    @Mock
+    private CrdbMetrics crdbMetrics;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void createTicket_persistsWithNuevoStatusAndDefaultSla() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         when(ticketRepository.save(any(Ticket.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -65,7 +70,7 @@ class TicketServiceTest {
 
     @Test
     void createTicket_publishesTicketCreatedEvent() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CreateTicketRequest request = new CreateTicketRequest(
@@ -81,12 +86,33 @@ class TicketServiceTest {
         assertThat(payloadCaptor.getValue())
                 .contains(result.getId().toString())
                 .contains("QUEVEDO_CENTRO")
-                .contains("Sin internet");
+                .contains("Sin internet")
+                .contains(result.getClientId().toString())
+                .contains(result.getCreatedAt().toString());
+    }
+
+    @Test
+    void createTicket_retriesOnceOnSerializableConflictAndIncrementsMetric() {
+        // Simula el conflicto de escritura serializable visto en vivo en
+        // report-service (ver ReportEventListener.applyWithRetry): CockroachDB
+        // aborta la primera transaccion, el segundo intento debe tener exito.
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
+        when(ticketRepository.save(any(Ticket.class)))
+                .thenThrow(new ConcurrencyFailureException("conflicto de escritura simulado"))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateTicketRequest request = new CreateTicketRequest(
+                Zone.QUEVEDO_NORTE, "Titulo", "Descripcion", null, null);
+
+        Ticket result = service.createTicket(request, UUID.randomUUID(), "CLIENTE");
+
+        assertThat(result).isNotNull();
+        verify(crdbMetrics).incrementTransactionRetries();
     }
 
     @Test
     void createTicket_asAdmin_isAllowed() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CreateTicketRequest request = new CreateTicketRequest(
@@ -97,7 +123,7 @@ class TicketServiceTest {
 
     @Test
     void createTicket_asTecnico_isForbidden() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         CreateTicketRequest request = new CreateTicketRequest(
                 Zone.QUEVEDO_NORTE, "Titulo", "Descripcion", null, null);
 
@@ -107,7 +133,7 @@ class TicketServiceTest {
 
     @Test
     void updateStatus_toResuelto_marksResolvedAtAndEvaluatesSlaBreach() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Zone zone = Zone.QUEVEDO_SUR;
 
@@ -120,11 +146,11 @@ class TicketServiceTest {
                 .slaDeadline(OffsetDateTime.now().minusHours(6)) // ya vencido
                 .build();
 
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
         ArgumentCaptor<Ticket> captor = ArgumentCaptor.forClass(Ticket.class);
         when(ticketRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
 
-        Ticket result = service.updateStatus(zone, id, TicketStatus.RESUELTO, "ADMIN", null);
+        Ticket result = service.updateStatus(id, TicketStatus.RESUELTO, "ADMIN", null);
 
         assertThat(result.getStatus()).isEqualTo(TicketStatus.RESUELTO);
         assertThat(result.getResolvedAt()).isNotNull();
@@ -133,108 +159,155 @@ class TicketServiceTest {
 
     @Test
     void updateStatus_byTecnicoInOwnZone_isAllowed() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Zone zone = Zone.QUEVEDO_NORTE;
         Ticket existing = ticketIn(zone, id);
 
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Ticket result = service.updateStatus(zone, id, TicketStatus.ASIGNADO, "TECNICO", zone);
+        Ticket result = service.updateStatus(id, TicketStatus.ASIGNADO, "TECNICO", zone);
 
         assertThat(result.getStatus()).isEqualTo(TicketStatus.ASIGNADO);
     }
 
     @Test
     void updateStatus_byTecnicoInAnotherZone_isForbidden() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Ticket existing = ticketIn(Zone.QUEVEDO_NORTE, id);
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.updateStatus(
-                Zone.QUEVEDO_NORTE, id, TicketStatus.ASIGNADO, "TECNICO", Zone.QUEVEDO_SUR))
+                id, TicketStatus.ASIGNADO, "TECNICO", Zone.QUEVEDO_SUR))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void updateStatus_byTecnicoWithNoZone_isForbidden() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Ticket existing = ticketIn(Zone.QUEVEDO_NORTE, id);
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.updateStatus(
-                Zone.QUEVEDO_NORTE, id, TicketStatus.ASIGNADO, "TECNICO", null))
+                id, TicketStatus.ASIGNADO, "TECNICO", null))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void updateStatus_byCliente_isForbidden() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Ticket existing = ticketIn(Zone.QUEVEDO_NORTE, id);
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.updateStatus(
-                Zone.QUEVEDO_NORTE, id, TicketStatus.ASIGNADO, "CLIENTE", null))
+                id, TicketStatus.ASIGNADO, "CLIENTE", null))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void assignTechnician_byTecnicoInAnotherZone_isForbidden() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Ticket existing = ticketIn(Zone.QUEVEDO_CENTRO, id);
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.assignTechnician(
-                Zone.QUEVEDO_CENTRO, id, UUID.randomUUID(), "TECNICO", Zone.QUEVEDO_NORTE))
+                id, UUID.randomUUID(), "TECNICO", Zone.QUEVEDO_NORTE))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
+    void updateStatus_publishesTicketStatusChangedEvent() {
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
+        UUID id = UUID.randomUUID();
+        Zone zone = Zone.QUEVEDO_NORTE;
+        Ticket existing = ticketIn(zone, id);
+        existing.setStatus(TicketStatus.NUEVO);
+
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Ticket result = service.updateStatus(id, TicketStatus.ASIGNADO, "ADMIN", null);
+
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(kafkaTemplate).send(org.mockito.ArgumentMatchers.eq("ticket.status-changed"), keyCaptor.capture(), payloadCaptor.capture());
+
+        assertThat(keyCaptor.getValue()).isEqualTo(result.getId().toString());
+        assertThat(payloadCaptor.getValue())
+                .contains(result.getId().toString())
+                .contains("NUEVO")
+                .contains("ASIGNADO");
+    }
+
+    @Test
+    void assignTechnician_publishesTicketAssignedEvent() {
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
+        UUID id = UUID.randomUUID();
+        Zone zone = Zone.QUEVEDO_NORTE;
+        Ticket existing = ticketIn(zone, id);
+        UUID technicianId = UUID.randomUUID();
+
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Ticket result = service.assignTechnician(id, technicianId, "ADMIN", null);
+
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(kafkaTemplate).send(org.mockito.ArgumentMatchers.eq("ticket.assigned"), keyCaptor.capture(), payloadCaptor.capture());
+
+        assertThat(keyCaptor.getValue()).isEqualTo(result.getId().toString());
+        assertThat(payloadCaptor.getValue())
+                .contains(result.getId().toString())
+                .contains(technicianId.toString());
+    }
+
+    @Test
     void getTicket_byOwningCliente_isAllowed() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         UUID clientId = UUID.randomUUID();
         Ticket existing = ticketIn(Zone.QUEVEDO_SUR, id);
         existing.setClientId(clientId);
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
 
-        Ticket result = service.getTicket(Zone.QUEVEDO_SUR, id, "CLIENTE", clientId, null);
+        Ticket result = service.getTicket(id, "CLIENTE", clientId, null);
 
         assertThat(result.getClientId()).isEqualTo(clientId);
     }
 
     @Test
     void getTicket_byNonOwningCliente_isForbidden() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Ticket existing = ticketIn(Zone.QUEVEDO_SUR, id);
         existing.setClientId(UUID.randomUUID());
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> service.getTicket(Zone.QUEVEDO_SUR, id, "CLIENTE", UUID.randomUUID(), null))
+        assertThatThrownBy(() -> service.getTicket(id, "CLIENTE", UUID.randomUUID(), null))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void getTicket_byTecnicoInAnotherZone_isForbidden() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID id = UUID.randomUUID();
         Ticket existing = ticketIn(Zone.QUEVEDO_SUR, id);
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(existing));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.getTicket(
-                Zone.QUEVEDO_SUR, id, "TECNICO", UUID.randomUUID(), Zone.QUEVEDO_CENTRO))
+                id, "TECNICO", UUID.randomUUID(), Zone.QUEVEDO_CENTRO))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void listTickets_asCliente_onlyReturnsOwnTickets() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         UUID clientId = UUID.randomUUID();
         Ticket own = ticketIn(Zone.QUEVEDO_NORTE, UUID.randomUUID());
         own.setClientId(clientId);
@@ -248,7 +321,7 @@ class TicketServiceTest {
 
     @Test
     void listTickets_asTecnico_onlyReturnsOwnZoneIgnoringZoneParam() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
         Ticket zoneTicket = ticketIn(Zone.QUEVEDO_NORTE, UUID.randomUUID());
         when(ticketRepository.findByZone(Zone.QUEVEDO_NORTE)).thenReturn(List.of(zoneTicket));
 
@@ -260,7 +333,7 @@ class TicketServiceTest {
 
     @Test
     void listTickets_asTecnicoWithNoZone_returnsEmpty() {
-        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper);
+        TicketService service = new TicketService(ticketRepository, kafkaTemplate, objectMapper, crdbMetrics);
 
         List<Ticket> result = service.listTickets(null, null, "TECNICO", UUID.randomUUID(), null);
 

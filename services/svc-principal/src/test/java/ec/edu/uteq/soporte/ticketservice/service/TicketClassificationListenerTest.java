@@ -51,7 +51,7 @@ class TicketClassificationListenerTest {
                 .slaBreached(false)
                 .build();
 
-        when(ticketRepository.findById(any())).thenReturn(Optional.of(ticket));
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.of(ticket));
         ArgumentCaptor<Ticket> captor = ArgumentCaptor.forClass(Ticket.class);
         when(ticketRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -71,7 +71,7 @@ class TicketClassificationListenerTest {
     @Test
     void unknownTicketIsIgnoredWithoutThrowing() {
         TicketClassificationListener listener = new TicketClassificationListener(ticketRepository, objectMapper);
-        when(ticketRepository.findById(any())).thenReturn(Optional.empty());
+        when(ticketRepository.findByTicketId(any())).thenReturn(Optional.empty());
 
         String payload = """
                 {"ticketId":"%s","zone":"QUEVEDO_SUR","category":"DNS","priority":"BAJO"}

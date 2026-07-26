@@ -7,24 +7,31 @@
 
 SET DATABASE = ticket_db;
 
--- Q1: Lectura por clave primaria (zone, id) — punto de acceso mas comun del sistema
+-- Q1: Lectura por id -- punto de acceso mas comun del sistema (ticket-service
+-- recibe un UUID de ticket sin conocer su fecha_apertura de antemano). Ya no
+-- resuelve dentro de la clave primaria (created_at, id): usa el indice unico
+-- secundario tickets_id_key (ver init_db.sql), que evita escanear las 4
+-- particiones a costa de un salto extra indice->tabla.
 EXPLAIN ANALYZE
-SELECT * FROM tickets WHERE zone = 'QUEVEDO_NORTE' AND id = (
-    SELECT id FROM tickets WHERE zone = 'QUEVEDO_NORTE' LIMIT 1
+SELECT * FROM tickets WHERE id = (
+    SELECT id FROM tickets LIMIT 1
 );
 
--- Q2: Consulta de rango — tickets abiertos en las ultimas 24 horas por zona
+-- Q2: Consulta de rango por fecha -- se resuelve dentro de una sola particion
+-- trimestral (la fragmentacion SI aporta aqui, a diferencia de Q1).
 EXPLAIN ANALYZE
-SELECT id, category, priority, status, created_at
+SELECT id, zone, category, priority, status, created_at
 FROM tickets
-WHERE zone = 'QUEVEDO_SUR' AND created_at >= now() - INTERVAL '24 hours'
+WHERE created_at >= now() - INTERVAL '24 hours'
 ORDER BY created_at DESC;
 
--- Q3: Consulta de rango entre fechas, sin filtro de zona (cruza particiones)
+-- Q3: Consulta filtrada por zona, sin filtro de fecha (cruza las 4 particiones
+-- trimestrales -- desde que la fragmentacion es por fecha y no por zona, todo
+-- filtro "por zona" es scatter-gather; ver ADR-0003, seccion de consecuencias).
 EXPLAIN ANALYZE
 SELECT zone, count(*) AS total
 FROM tickets
-WHERE created_at BETWEEN now() - INTERVAL '7 days' AND now()
+WHERE zone = 'QUEVEDO_SUR'
 GROUP BY zone;
 
 -- Q4: Agregacion — SLA breach rate por zona y categoria

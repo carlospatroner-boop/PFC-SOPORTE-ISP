@@ -9,6 +9,11 @@
 # (WSL2/Docker Desktop en Windows) el reloj de la VM se desincroniza unos
 # segundos tras cada suspension del host y CockroachDB rechaza arrancar si
 # detecta mas desfase que max-offset. No usar este valor en un cluster real.
+# Nota: mem_limit subido de 512m a 1024m -- con 512m, un solo INSERT de
+# decenas de miles de filas en una transaccion (o el proceso de recuperacion
+# tras reiniciar un nodo) satura la memoria y Docker mata el contenedor
+# (OOM, visto en vivo). 1024m da margen real sin dejar de ser liviano para
+# correr los 3 nodos + Kafka + Mongo en una sola maquina de desarrollo.
 
 networks:
   soporte-net:
@@ -33,7 +38,7 @@ services:
     volumes:
       - roach1-data:/cockroach/cockroach-data
     networks: [soporte-net]
-    mem_limit: 512m
+    mem_limit: 1024m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
       interval: 10s
@@ -52,7 +57,7 @@ services:
     volumes:
       - roach2-data:/cockroach/cockroach-data
     networks: [soporte-net]
-    mem_limit: 512m
+    mem_limit: 1024m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
       interval: 10s
@@ -71,7 +76,7 @@ services:
     volumes:
       - roach3-data:/cockroach/cockroach-data
     networks: [soporte-net]
-    mem_limit: 512m
+    mem_limit: 1024m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
       interval: 10s

@@ -18,7 +18,10 @@ import java.util.UUID;
 
 /**
  * Entidad Ticket, mapeada a la tabla particionada `tickets` del cluster CockroachDB
- * (fragmentacion horizontal por zona -- ver ADR-0003 y db-cluster/scripts/init_db.sql).
+ * (fragmentacion horizontal por fecha_apertura/created_at -- ver ADR-0003 y
+ * db-cluster/scripts/init_db.sql). "zone" ya NO es parte de la clave de
+ * fragmentacion -- sigue existiendo como columna de negocio (RBAC de TECNICO,
+ * reportes por zona), respaldada por un indice secundario normal, no por la PK.
  */
 @Entity
 @Table(name = "tickets")
@@ -31,13 +34,16 @@ import java.util.UUID;
 public class Ticket {
 
     @Id
-    @Enumerated(EnumType.STRING)
-    @Column(name = "zone", nullable = false)
-    private Zone zone;
+    @Column(name = "created_at", nullable = false)
+    private OffsetDateTime createdAt;
 
     @Id
     @Column(name = "id", nullable = false)
     private UUID id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "zone", nullable = false)
+    private Zone zone;
 
     @Column(name = "client_id", nullable = false)
     private UUID clientId;
@@ -59,9 +65,6 @@ public class Ticket {
 
     @Column(name = "description")
     private String description;
-
-    @Column(name = "created_at", nullable = false)
-    private OffsetDateTime createdAt;
 
     @Column(name = "sla_deadline")
     private OffsetDateTime slaDeadline;

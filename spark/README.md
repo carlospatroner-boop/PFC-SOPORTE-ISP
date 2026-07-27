@@ -25,7 +25,7 @@ Los tres pasos siguientes se corren igual, sustituyendo `python archivo.py` por
 ### Alternativa: instalar PySpark localmente (Linux/Mac sin fricción, Windows con `winutils.exe`)
 
 ```bash
-pip install pandas numpy pyarrow pyspark scipy matplotlib --break-system-packages
+pip install -r requirements.txt --break-system-packages
 ```
 
 Requiere Java 11+ instalado (PySpark lo necesita aunque el resto del stack sea Java 21). En
@@ -40,16 +40,38 @@ Todos los comandos de abajo se corren desde esta carpeta (`spark/`), no desde `s
 docker compose -f docker-compose.spark.yml run --rm spark generate_dataset.py --rows 600000 --out ../data/processed/incidents
 ```
 
-Esto crea Parquet particionado por zona en `spark/data/processed/incidents/`. Documentar en
-`spark/data/README.md` que el dataset es sintético y por qué (ver comentario en el propio script).
+Esto crea Parquet particionado por zona en `spark/data/processed/incidents/`, con `client_id`
+(pool sesgado por distribución de Pareto — la mayoría de los clientes aparece una sola vez, una
+minoría concentra muchas incidencias, lo que le da señal real al análisis de reincidencia) y
+`description` (texto libre corto por plantilla, necesario para el paso de clustering). Documentar
+en `spark/data/README.md` que el dataset es sintético y por qué (ver comentario en el propio
+script).
 
 ## 2. Validar el pipeline una vez (antes de medir speedup)
 
 ```bash
-docker compose -f docker-compose.spark.yml run --rm spark pipeline.py --data ../data/processed/incidents --master "local[4]"
+docker compose -f docker-compose.spark.yml run --rm spark pipeline.py --data ../data/processed/incidents --master "local[4]" --out ../results/parquet
 ```
 
-Debe imprimir los tiempos de las 5 transformaciones y la tabla de "zonas problemáticas".
+Debe imprimir los tiempos de las 5 transformaciones exigidas por la guía (Módulo E, Sección 5.6):
+
+1. **Filtrado** — incidencias resueltas y con datos completos.
+2. **Join colocalizado** — incidencias ⋈ clientes por `client_id` (Tabla 1 de la guía, ACC).
+3. **Ventana** — `Window.partitionBy("client_id").orderBy("timestamp")`, orden y timestamp anterior por cliente.
+4. **Tipos temporales** — días desde la incidencia anterior + bandera de reincidencia en 30 días.
+5. **ML** — `StringIndexer` (zona) + TF-IDF + `KMeans`: agrupamiento de incidencias por texto y zona.
+
+Con `--out` escribe `reincidencia/` y `clustering/` en Parquet dentro de esa carpeta.
+
+## 2b. Baseline secuencial en pandas (D4.2 — comparación con Spark)
+
+```bash
+docker compose -f docker-compose.spark.yml run --rm spark baseline.py --data ../data/processed/incidents --out-json ../results/baseline.json
+```
+
+Corre las mismas 5 transformaciones con pandas + scikit-learn puro (sin Spark, un solo proceso),
+sobre el mismo dataset — el punto de comparación para demostrar que Spark aporta un speedup real
+y no solo overhead de coordinación distribuida.
 
 ## 3. Medir speedup y ajustar Amdahl (Paso 7)
 
@@ -74,14 +96,16 @@ jupyter nbconvert --to html notebooks/spark_pipeline.ipynb
 
 ## 5. Integración con el PFC (Paso 8)
 
-El resultado de `t4_mttr_by_zone_hour` / `t5_problematic_zones` debe escribirse como tabla en
-CockroachDB (`network_incidents_summary`, ya creada en `db-cluster/scripts/init_db.sql`) usando el
-conector JDBC de Spark:
+El resultado de `t4_recurrence_flag` (reincidencia) o `t5_cluster_by_text_and_zone` (clustering)
+puede escribirse como tabla en CockroachDB usando el conector JDBC de Spark (la tabla destino debe
+ajustar su esquema a las columnas de cada DataFrame -- `network_incidents_summary`, en
+`db-cluster/scripts/init_db.sql`, quedó pensada para el pipeline anterior de MTTR por hora/zona y
+necesitaría una migración de esquema si se quiere reutilizar para reincidencia/clustering):
 
 ```python
-result_df.write.jdbc(
+reincidencia_df.write.jdbc(
     url="jdbc:postgresql://roach1:26257/ticket_db?sslmode=disable",
-    table="network_incidents_summary",
+    table="incident_recurrence_summary",
     mode="append",
     properties={"user": "root", "driver": "org.postgresql.Driver"},
 )

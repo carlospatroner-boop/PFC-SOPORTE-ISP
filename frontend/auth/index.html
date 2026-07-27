@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acceso — Soporte Técnico ISP</title>
+  <link rel="stylesheet" href="auth.css" />
+</head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-card" id="auth-card">
+      <div class="brand">
+        <div class="brand-mark">ST</div>
+        <div class="brand-text">
+          <strong>Soporte Técnico ISP</strong>
+          <span>equipo ACC · auth-service</span>
+        </div>
+      </div>
+
+      <div class="tab-toggle" id="tab-toggle">
+        <button type="button" class="tab-btn active" data-tab="login">Iniciar sesión</button>
+        <button type="button" class="tab-btn" data-tab="register">Registrarme</button>
+      </div>
+
+      <div id="error-banner" class="error-banner hidden"></div>
+
+      <!-- ---------- Login ---------- -->
+      <form id="login-form" class="auth-form">
+        <label>
+          Correo
+          <input type="email" name="email" required autocomplete="username" placeholder="cliente@test.com" />
+        </label>
+        <label>
+          Contraseña
+          <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••" />
+        </label>
+        <button type="submit" class="btn-primary">Iniciar sesión</button>
+      </form>
+
+      <!-- ---------- Registro ---------- -->
+      <form id="register-form" class="auth-form hidden">
+        <p class="hint" style="margin-top:0;">Esta opción es para <strong>clientes del ISP</strong> que quieren crear
+          su propia cuenta y reportar solicitudes de soporte por su cuenta. Siempre crea un usuario con rol
+          <strong>CLIENTE</strong>. Las cuentas de TÉCNICO o ADMIN no se auto-registran aquí — las crea un
+          administrador desde el panel interno, por seguridad.</p>
+        <label>
+          Nombre completo
+          <input type="text" name="fullName" required placeholder="Ada Lovelace" />
+        </label>
+        <label>
+          Correo
+          <input type="email" name="email" required autocomplete="username" placeholder="cliente@test.com" />
+        </label>
+        <label>
+          Contraseña
+          <input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres" />
+        </label>
+        <button type="submit" class="btn-primary">Crear cuenta</button>
+      </form>
+    </div>
+
+    <!-- ---------- Panel de sesión (post-login) ---------- -->
+    <div class="auth-card session-panel hidden" id="session-panel">
+      <div class="brand">
+        <div class="brand-mark">ST</div>
+        <div class="brand-text">
+          <strong>Sesión activa</strong>
+          <span id="session-email">—</span>
+        </div>
+      </div>
+
+      <div class="session-row">
+        <span class="session-label">Rol</span>
+        <span class="badge" id="session-role">—</span>
+      </div>
+
+      <div class="session-row">
+        <span class="session-label">Permisos</span>
+        <div class="permission-chips" id="session-permissions"></div>
+      </div>
+
+      <div class="session-row">
+        <span class="session-label">Access token expira en</span>
+        <span class="countdown" id="session-countdown">—</span>
+      </div>
+
+      <div class="session-actions">
+        <a href="../index.html" class="btn-primary" id="go-to-dashboard" style="text-decoration:none; text-align:center; display:inline-block;">Ir al Panel de Tickets</a>
+      </div>
+      <div class="session-actions">
+        <button type="button" class="btn-secondary" id="btn-validate">Probar validar</button>
+        <button type="button" class="btn-secondary" id="btn-refresh">Probar refresh</button>
+        <button type="button" class="btn-danger" id="btn-logout">Cerrar sesión</button>
+      </div>
+
+      <details class="raw-details">
+        <summary>Ver respuesta cruda de /validate</summary>
+        <pre id="session-raw">—</pre>
+      </details>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="auth.js"></script>
+</body>
+</html>

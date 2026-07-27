@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Soporte ISP — Panel de Tickets Distribuido</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">SI</div>
+        <div class="brand-text">
+          <strong>Soporte ISP</strong>
+          <span>Panel de Tickets</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a class="nav-item active" data-view="dashboard" id="nav-dashboard">
+          <span class="nav-dot"></span> Dashboard
+        </a>
+        <a class="nav-item" data-view="board">
+          <span class="nav-dot"></span> <span id="nav-board-label">Tablero de Tickets</span>
+        </a>
+        <a class="nav-item hidden" data-view="admin" id="nav-admin">
+          <span class="nav-dot"></span> Administración
+        </a>
+        <a class="nav-item hidden" data-view="reports" id="nav-reports">
+          <span class="nav-dot"></span> Reportes
+        </a>
+      </nav>
+
+      <div class="sidebar-section" id="sidebar-zones-section">
+        <h4>Zonas del cluster</h4>
+        <ul class="zone-legend" id="zone-legend"></ul>
+        <a class="console-link" href="http://localhost:8080" target="_blank" rel="noopener">
+          Ver consola CockroachDB ↗
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <div id="conn-indicator" class="conn-indicator conn-unknown">
+          <span class="dot"></span> Verificando conexión…
+        </div>
+        <small id="session-indicator">
+          <a href="auth/index.html" style="color:#9ca3d0">Iniciar sesión</a>
+        </small>
+        <small id="sidebar-tech-footer">ticket-service · localhost:8002</small>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="view-title">Dashboard</h1>
+          <p id="view-subtitle">Vista general del sistema distribuido de soporte técnico</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="zone-filter" id="zone-filter">
+            <button class="chip active" data-zone="ALL">Todas las zonas</button>
+            <button class="chip" data-zone="QUEVEDO_CENTRO">Centro</button>
+            <button class="chip" data-zone="QUEVEDO_NORTE">Norte</button>
+            <button class="chip" data-zone="QUEVEDO_SUR">Sur</button>
+          </div>
+          <span class="chip hidden" id="scope-label" style="background:#eef0f8"></span>
+          <button class="btn-icon" id="refresh-btn" title="Actualizar">⟳</button>
+          <button class="btn-primary" id="new-ticket-btn">+ Nuevo ticket</button>
+        </div>
+      </header>
+
+      <div id="error-banner" class="error-banner hidden"></div>
+
+      <section id="view-dashboard" class="view">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Tickets totales</span>
+            <span class="kpi-value" id="kpi-total">–</span>
+            <span class="kpi-trend">en las 3 zonas</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Abiertos</span>
+            <span class="kpi-value" id="kpi-open">–</span>
+            <span class="kpi-trend">nuevo · asignado · en progreso</span>
+          </div>
+          <div class="kpi-card kpi-warn">
+            <span class="kpi-label">SLA vencido</span>
+            <span class="kpi-value" id="kpi-sla">–</span>
+            <span class="kpi-trend">requieren atención inmediata</span>
+          </div>
+          <div class="kpi-card kpi-ok">
+            <span class="kpi-label">Resueltos / Cerrados</span>
+            <span class="kpi-value" id="kpi-resolved">–</span>
+            <span class="kpi-trend">ciclo completado</span>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card">
+            <h3>Distribución por zona</h3>
+            <p class="chart-hint">La fragmentación real de <code>tickets</code> es por fecha de apertura (<code>PARTITION BY RANGE</code>) — la zona es una dimensión de negocio indexada, no la clave de partición (ver ADR-0003)</p>
+            <canvas id="chart-zone"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Tickets por estado</h3>
+            <p class="chart-hint">Ciclo de vida definido en la máquina de estados del dominio</p>
+            <canvas id="chart-status"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-board" class="view hidden">
+        <div class="board" id="board"></div>
+      </section>
+
+      <section id="view-admin" class="view hidden">
+        <div class="admin-grid">
+          <div class="admin-card">
+            <h3>Crear cuenta</h3>
+            <p class="chart-hint">El registro público solo crea cuentas CLIENTE — aquí se crean cuentas de TÉCNICO o ADMIN.</p>
+            <form id="admin-create-user-form" class="admin-form">
+              <label>
+                Correo
+                <input type="email" name="email" placeholder="tecnico.sur@test.com" required />
+              </label>
+              <label>
+                Nombre completo
+                <input type="text" name="fullName" placeholder="Técnico Sur" required />
+              </label>
+              <label>
+                Contraseña
+                <input type="password" name="password" minlength="8" placeholder="Mínimo 8 caracteres" required />
+              </label>
+              <label>
+                Rol
+                <div class="role-toggle" id="admin-role-toggle">
+                  <button type="button" class="role-btn active" data-role="CLIENTE">Cliente</button>
+                  <button type="button" class="role-btn" data-role="TECNICO">Técnico</button>
+                  <button type="button" class="role-btn" data-role="ADMIN">Admin</button>
+                </div>
+                <input type="hidden" name="role" id="admin-role-input" value="CLIENTE" />
+              </label>
+              <label id="admin-zone-field" class="hidden">
+                Zona del técnico
+                <select name="zone">
+                  <option value="QUEVEDO_CENTRO">Quevedo Centro</option>
+                  <option value="QUEVEDO_NORTE">Quevedo Norte</option>
+                  <option value="QUEVEDO_SUR">Quevedo Sur</option>
+                </select>
+              </label>
+              <button type="submit" class="btn-primary admin-submit-btn">+ Crear cuenta</button>
+            </form>
+          </div>
+          <div class="admin-card">
+            <h3>Cuentas registradas</h3>
+            <p class="chart-hint">Todas las cuentas de auth-service</p>
+            <ul id="admin-created-users" class="admin-user-list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-reports" class="view hidden">
+        <div id="reports-error" class="error-banner hidden"></div>
+        <div class="reports-toolbar">
+          <button class="btn-secondary" id="reports-refresh-btn">⟳ Actualizar</button>
+          <button class="btn-primary" id="reports-export-btn">⬇ Descargar CSV</button>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Tickets totales</span>
+            <span class="kpi-value" id="rpt-kpi-total">–</span>
+            <span class="kpi-trend">modelo de lectura CQRS (report-service)</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Zonas con actividad</span>
+            <span class="kpi-value" id="rpt-kpi-zones">–</span>
+            <span class="kpi-trend">de 3 zonas totales</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Categorías detectadas</span>
+            <span class="kpi-value" id="rpt-kpi-categories">–</span>
+            <span class="kpi-trend">clasificadas por ai-service</span>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="chart-card">
+            <h3>Tickets por estado</h3>
+            <p class="chart-hint">Agregado directo de <code>ticket_summary</code>, sin tocar la base transaccional</p>
+            <canvas id="chart-report-status"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Tickets por categoría</h3>
+            <p class="chart-hint">Solo cuenta tickets ya clasificados por ai-service</p>
+            <canvas id="chart-report-category"></canvas>
+          </div>
+        </div>
+
+        <div class="admin-card">
+          <h3>Detalle de tickets</h3>
+          <p class="chart-hint">Modelo de lectura de report-service — puede tardar unos segundos en reflejar el último evento</p>
+          <div class="reports-table-wrap">
+            <table class="reports-table" id="reports-table">
+              <thead>
+                <tr>
+                  <th>Zona</th><th>Ticket</th><th>Estado</th><th>Categoría</th>
+                  <th>Prioridad</th><th>Técnico</th><th>Creado</th>
+                </tr>
+              </thead>
+              <tbody id="reports-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Nueva solicitud de soporte</h2>
+        <button class="btn-close" id="modal-close">×</button>
+      </div>
+      <form id="create-form">
+        <label>
+          Zona
+          <select name="zone" required>
+            <option value="QUEVEDO_CENTRO">Quevedo Centro</option>
+            <option value="QUEVEDO_NORTE">Quevedo Norte</option>
+            <option value="QUEVEDO_SUR">Quevedo Sur</option>
+          </select>
+        </label>
+        <label>
+          Título
+          <input type="text" name="title" placeholder="Sin acceso a Internet" required />
+        </label>
+        <label>
+          Descripción
+          <textarea name="description" rows="3" placeholder="El router muestra luz roja desde las 08:00" required></textarea>
+        </label>
+        <div class="form-row">
+          <label>
+            Teléfono de contacto
+            <input type="text" name="contactPhone" placeholder="0991234567" />
+          </label>
+          <label>
+            Dirección
+            <input type="text" name="address" placeholder="Av. Quevedo 123" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="modal-cancel">Cancelar</button>
+          <button type="submit" class="btn-primary">Crear ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-detail-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="detail-modal-title">Detalle del ticket</h2>
+        <button class="btn-close" id="detail-close">×</button>
+      </div>
+      <div id="detail-content" class="detail-content"></div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js?v=8"></script>
+</body>
+</html>

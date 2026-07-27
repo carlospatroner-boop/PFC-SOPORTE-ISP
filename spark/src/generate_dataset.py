@@ -11,6 +11,14 @@ que, si se usan datos sintéticos, su procedencia y generación queden documenta
   - tiene estructura temporal realista (más incidencias en horas pico,
     estacionalidad semanal) para que el análisis de patrones temporales
     (Paso 6, transformación de agregación por hora) tenga sentido real
+  - asigna cada incidencia a un client_id de un pool sesgado (distribución de
+    Pareto): la mayoría de los clientes reportan 1 incidencia, una minoría
+    concentra muchas -- esto es lo que hace que el análisis de reincidencia
+    (Tabla 1 de la guía de E3, columna "Analítica paralela" del equipo ACC)
+    tenga señal real y no sea uniforme/trivial
+  - incluye una descripción de texto libre corta por incidencia (plantillas por
+    tipo), necesaria para el paso de clustering por texto (Paso 6, transformación
+    de ML)
 
 Salida: Parquet particionado por zona en /data/processed/incidents/
 (el path exacto se define con --out).
@@ -40,6 +48,44 @@ SEVERITY_WEIGHTS = [0.10, 0.25, 0.40, 0.25]
 
 N_NODES_PER_ZONE = 40  # nodos/equipos de red simulados por zona
 N_TECHNICIANS = 18
+N_CLIENTS_PER_ZONE = 30_000  # pool de clientes por zona (ver transformations.build_clients_dim)
+
+# Plantillas de descripcion libre por tipo de incidencia -- honestidad sobre el
+# alcance (misma convencion que ai-service/app/classifier.py): son plantillas
+# fijas, no texto real de clientes, pero le dan al paso de clustering (T5) texto
+# de verdad sobre el que operar en vez de una sola palabra categorica.
+DESCRIPTION_TEMPLATES = {
+    "DNS": [
+        "el internet conecta pero las paginas no cargan",
+        "no resuelve nombres de dominio desde esta manana",
+        "puedo hacer ping pero el navegador no abre sitios",
+        "el wifi funciona pero google no carga",
+    ],
+    "CORTE_TOTAL": [
+        "no hay servicio de internet en absoluto",
+        "las luces del modem estan apagadas",
+        "corte total desde anoche en toda la casa",
+        "sin conexion, ya reinicie el router y nada",
+    ],
+    "LENTITUD": [
+        "la velocidad es muchisimo mas baja de lo contratado",
+        "el internet se pone lento todas las noches",
+        "los videos se traban constantemente",
+        "la conexion baja mucho en horas pico",
+    ],
+    "HARDWARE": [
+        "el router no enciende",
+        "hay un cable de red visiblemente danado",
+        "el modem hace un ruido raro y se apaga solo",
+        "se quemo el equipo tras una tormenta electrica",
+    ],
+    "CONFIGURACION": [
+        "necesito reconfigurar el router con mi clave wifi",
+        "cambie de equipo y no logro conectarlo",
+        "quiero cambiar el nombre de mi red wifi",
+        "no logro acceder al panel de administracion del router",
+    ],
+}
 
 
 def hourly_weight(hour: int) -> float:
@@ -78,6 +124,23 @@ def generate(rows: int, seed: int = 42) -> pd.DataFrame:
     ]
     technician_ids = rng.integers(1, N_TECHNICIANS + 1, size=rows)
 
+    # client_id con distribucion de Pareto por zona: la mayoria de los clientes
+    # aparece 1 vez, una minoria concentra muchas incidencias -- esa cola larga es
+    # la que hace que "reincidencia" (T3/T4 de transformations.py) tenga sentido.
+    client_ids = np.empty(rows, dtype=object)
+    for zone in ZONES:
+        mask = zones == zone
+        n_in_zone = int(mask.sum())
+        pool = [f"{zone}-CLIENTE-{i:05d}" for i in range(1, N_CLIENTS_PER_ZONE + 1)]
+        weights = rng.pareto(1.5, size=N_CLIENTS_PER_ZONE) + 1
+        weights = weights / weights.sum()
+        client_ids[mask] = rng.choice(pool, size=n_in_zone, p=weights)
+
+    descriptions = [
+        DESCRIPTION_TEMPLATES[itype][rng.integers(0, len(DESCRIPTION_TEMPLATES[itype]))]
+        for itype in incident_types
+    ]
+
     # duracion e incidencia correlacionadas con severidad y tipo (para que MTTR tenga señal real)
     severity_base_minutes = {"CRITICO": 180, "ALTO": 90, "MEDIO": 45, "BAJO": 15}
     incident_multiplier = {
@@ -100,7 +163,9 @@ def generate(rows: int, seed: int = 42) -> pd.DataFrame:
         "incident_id": np.arange(1, rows + 1),
         "zone": zones,
         "node_id": node_ids,
+        "client_id": client_ids,
         "incident_type": incident_types,
+        "description": descriptions,
         "severity": severities,
         "technician_id": technician_ids,
         "timestamp": timestamps,
@@ -125,7 +190,11 @@ def main():
     df = generate(args.rows, args.seed)
 
     os.makedirs(args.out, exist_ok=True)
-    # Particionado por zona en el propio Parquet, coherente con la fragmentacion de CockroachDB
+    # Particionado por zona en el propio Parquet -- decision independiente de
+    # como fragmenta CockroachDB la tabla tickets (por fecha_apertura, ver
+    # ADR-0003): este dataset de telemetria es una tabla distinta, y zone sigue
+    # siendo la columna de menor cardinalidad util para el layout fisico del
+    # Parquet (client_id tiene demasiados valores distintos para particionar por el).
     df.to_parquet(args.out, engine="pyarrow", partition_cols=["zone"], index=False)
 
     print(f"Dataset generado: {len(df):,} filas -> {args.out}")

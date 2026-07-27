@@ -1,0 +1,11 @@
+# Dependencias del pipeline Spark + baseline pandas (equipo ACC).
+# Instalar con: pip install -r requirements.txt --break-system-packages
+pandas
+numpy
+pyarrow
+pyspark==4.1.2
+scipy
+matplotlib
+scikit-learn
+jupyter
+nbconvert

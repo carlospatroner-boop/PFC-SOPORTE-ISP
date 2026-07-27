@@ -1,0 +1,381 @@
+openapi: 3.0.3
+info:
+  title: Sistema de Soporte Técnico ISP — equipo ACC
+  description: >
+    Contrato REST de los 5 microservicios del PFC. Cada servicio corre en su
+    propio puerto y mantiene su propia base de datos (auth_db / ticket_db /
+    notifications_db / ai_db / report_db) -- no hay un API Gateway todavía, así
+    que cada servidor de esta especificación apunta directo a un microservicio.
+  version: "3.0.0"
+  contact:
+    name: Equipo ACC — Aplicaciones Distribuidas (ISR-701), UTEQ
+
+servers:
+  - url: http://localhost:8001/api/v1/auth
+    description: auth-service
+  - url: http://localhost:8002/api/v1/tickets
+    description: ticket-service
+  - url: http://localhost:8003/api/v1/notifications
+    description: notification-service
+  - url: http://localhost:8004/api/v1/ai
+    description: ai-service
+  - url: http://localhost:8005/api/v1/reports
+    description: report-service
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiResponse:
+      type: object
+      description: Envoltura estándar de respuesta usada por auth-service, ticket-service y report-service.
+      properties:
+        data: {}
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Ticket:
+      type: object
+      properties:
+        zone:
+          type: string
+          enum: [QUEVEDO_CENTRO, QUEVEDO_NORTE, QUEVEDO_SUR]
+        ticketId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        technicianId:
+          type: string
+          format: uuid
+          nullable: true
+        category:
+          type: string
+          nullable: true
+          enum: [CONECTIVIDAD, DNS, HARDWARE, CONFIGURACION, VELOCIDAD]
+        priority:
+          type: string
+          nullable: true
+          enum: [CRITICO, ALTO, MEDIO, BAJO]
+        status:
+          type: string
+          enum: [NUEVO, ASIGNADO, EN_PROGRESO, ESCALADO, RESUELTO, CERRADO]
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        slaDeadline:
+          type: string
+          format: date-time
+        slaBreached:
+          type: boolean
+
+    CreateTicketRequest:
+      type: object
+      required: [zone, title, description]
+      properties:
+        zone:
+          type: string
+          enum: [QUEVEDO_CENTRO, QUEVEDO_NORTE, QUEVEDO_SUR]
+        title:
+          type: string
+        description:
+          type: string
+        contactPhone:
+          type: string
+        address:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Token ausente o inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiResponse"
+    Forbidden:
+      description: Rol autenticado sin permiso para esta operación
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiResponse"
+
+paths:
+  /register:
+    post:
+      tags: [auth-service]
+      summary: Registro público (fuerza rol CLIENTE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                fullName: { type: string }
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+
+  /login:
+    post:
+      tags: [auth-service]
+      summary: Login, devuelve access token + refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: accessToken/refreshToken emitidos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /refresh:
+    post:
+      tags: [auth-service]
+      summary: Rota el refresh token (detecta reuso y revoca en cascada)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200": { description: Nuevo par access/refresh token }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /logout:
+    post:
+      tags: [auth-service]
+      summary: Revoca un refresh token
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Sesión cerrada }
+
+  /validate:
+    get:
+      tags: [auth-service]
+      summary: Valida un access token (consumido por AuthGatewayFilter de otros servicios)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: userId/role/zone del token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /admin/users:
+    post:
+      tags: [auth-service]
+      summary: Crear cuenta CLIENTE/TECNICO/ADMIN (solo ADMIN)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName, role]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                fullName: { type: string }
+                role: { type: string, enum: [CLIENTE, TECNICO, ADMIN] }
+                zone:
+                  type: string
+                  description: Obligatorio si role=TECNICO, prohibido en otro caso
+      responses:
+        "201": { description: Cuenta creada }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [auth-service]
+      summary: Listar todas las cuentas (solo ADMIN)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Lista de usuarios }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /:
+    post:
+      tags: [ticket-service]
+      summary: Crear ticket (CLIENTE/ADMIN)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTicketRequest" }
+      responses:
+        "201":
+          description: Ticket creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [ticket-service]
+      summary: Listar tickets (filtrado por rol -- ver TicketService)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: zone
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Lista de tickets visibles para el rol autenticado }
+
+  /{id}:
+    get:
+      tags: [ticket-service]
+      summary: Detalle de un ticket por id
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Ticket encontrado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { description: Ticket no encontrado }
+
+  /{id}/status:
+    patch:
+      tags: [ticket-service]
+      summary: Cambiar estado (TECNICO en su zona / ADMIN)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [NUEVO, ASIGNADO, EN_PROGRESO, ESCALADO, RESUELTO, CERRADO] }
+      responses:
+        "200": { description: Estado actualizado }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /{id}/assign:
+    post:
+      tags: [ticket-service]
+      summary: Asignar técnico (TECNICO en su zona / ADMIN)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: technicianId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Técnico asignado }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /notifications:
+    get:
+      tags: [notification-service]
+      summary: Notificaciones simuladas guardadas (demo/depuración)
+      parameters:
+        - name: ticketId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Lista de notificaciones simuladas }
+
+  /classifications/{ticket_id}:
+    get:
+      tags: [ai-service]
+      summary: Clasificación guardada para un ticket
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: category/priority/suggestion clasificados }
+        "404": { description: Aún no se procesó ese ticket }
+
+  /summary:
+    get:
+      tags: [report-service]
+      summary: Agregados del modelo de lectura CQRS (solo ADMIN)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: totalTickets/byStatus/byZone/byCategory }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /tickets:
+    get:
+      tags: [report-service]
+      summary: Lista filtrable del modelo de lectura (solo ADMIN)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: zone
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: Lista de TicketSummaryResponse }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /export.csv:
+    get:
+      tags: [report-service]
+      summary: Exportación CSV del modelo de lectura (solo ADMIN)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Archivo CSV
+          content:
+            text/csv:
+              schema: { type: string }
+        "403": { $ref: "#/components/responses/Forbidden" }

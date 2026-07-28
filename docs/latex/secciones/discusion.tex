@@ -1,0 +1,67 @@
+\section{Discusión}
+\label{sec:discusion}
+
+\subsection{Sobre la fragmentación por fecha frente al patrón de acceso real}
+
+El rediseño de la fragmentación descrito en la Sección~\ref{sec:diseno-esquema} ilustra una tensión
+frecuente en el diseño de sistemas distribuidos: la clave de fragmentación que exige el requisito
+formal de la asignatura (\texttt{fecha\_apertura}) no coincide con el filtro más frecuente del
+dominio real del problema (\texttt{zone}, usado por el control de acceso por rol de técnico y por
+la mayoría de los reportes operativos). Se priorizó el cumplimiento literal del requisito sobre la
+preferencia de diseño original, documentando explícitamente en el ADR-0003 el costo aceptado
+—consultas por zona convertidas en \emph{scatter-gather} sobre las cuatro particiones— en vez de
+ocultarlo o de forzar un diseño híbrido no solicitado. En un sistema de producción real, esta
+decisión probablemente se resolvería con una fragmentación compuesta (por ejemplo, subparticiones
+por zona dentro de cada partición temporal) o con un índice secundario global cubriente sobre
+\texttt{zone}; ambas alternativas quedan fuera del alcance de esta entrega pero se identifican como
+extensión natural del diseño actual.
+
+\subsection{Sobre la colocalización cliente–ticket entre microservicios}
+
+La limitación más significativa frente a la letra de la guía es la imposibilidad de colocalizar
+físicamente \texttt{tickets} con la tabla de clientes, porque esta última es propiedad de
+\texttt{auth-service} en una base de datos distinta. Esta tensión —requisito de la guía de
+Entrega 3 (pensada para un esquema monolítico o de bases de datos compartidas) contra un principio
+central de la arquitectura de microservicios adoptada desde la Entrega 2 (cada servicio es dueño
+exclusivo de su propio esquema)— se resolvió documentando la limitación en vez de comprometer el
+límite de propiedad de datos entre servicios, que es una de las garantías arquitectónicas más
+valiosas de la descomposición en microservicios~\cite{newman2021microservices}: permite evolucionar
+o escalar \texttt{ticket-service} sin coordinar cambios de esquema con \texttt{auth-service}. La
+alternativa de aplicación —resolución de identidad del cliente vía JWT en vez de una clave física
+compartida— preserva esta garantía a costa de no poder ejecutar un \emph{join} físico dentro del
+motor de base de datos entre ambas tablas.
+
+\subsection{Sobre la instrumentación y la observabilidad}
+
+La combinación de pruebas de integración con Testcontainers y métricas Prometheus verificadas con
+\texttt{promtool} (Sección~\ref{sec:cluster-verificacion}) resultó más valiosa de lo previsto
+inicialmente para diagnosticar el propio incidente de saturación de memoria descrito en esa
+sección: sin las métricas de reintentos y sin comprender el comportamiento esperado del aislamiento
+serializable —verificado previamente en las pruebas de integración—, habría sido más difícil
+distinguir un problema de recursos del sistema operativo (memoria insuficiente) de un problema de
+diseño en la capa de datos. Esto refuerza un principio general de sistemas distribuidos: la
+observabilidad no es solo un requisito de cumplimiento de la rúbrica, sino una herramienta de
+diagnóstico que se vuelve indispensable precisamente cuando el sistema falla de forma inesperada.
+
+\subsection{Sobre la representatividad del pipeline analítico}
+
+El pipeline de Spark descrito en la Sección~\ref{sec:pipeline-paralelo} se diseñó deliberadamente
+para reflejar un caso de uso analítico propio del dominio (reincidencia y \emph{clustering} de
+incidencias) en vez de aplicar las cinco transformaciones exigidas de forma genérica sobre datos
+sin relación con el negocio. Esto tiene un costo: los resultados de \emph{speedup} del protocolo
+experimental (Sección~\ref{sec:protocolo-resultados}) son específicos a un pipeline dominado por
+una etapa de \emph{join}/ventana con \emph{shuffle} moderado y una etapa final de aprendizaje
+automático relativamente costosa (vectorización TF-IDF + \texttt{KMeans}), y no necesariamente
+generalizan a pipelines de Spark dominados por \emph{shuffles} masivos entre tablas de tamaño
+comparable. Se documenta esta amenaza a la validez externa explícitamente en la
+Sección~\ref{sec:protocolo-resultados} en vez de presentar la conclusión del experimento como
+universalmente aplicable a cualquier carga de trabajo de Spark.
+
+\subsection{Alcance no cubierto en esta entrega}
+
+Dos elementos mencionados en la guía de la asignatura —un \emph{API Gateway} explícito como punto
+de entrada único al conjunto de microservicios, y la orquestación completa de los cinco
+microservicios mediante un único archivo \texttt{docker-compose.yml} raíz— no se implementaron en
+esta entrega y quedan identificados como extensión pendiente: actualmente cada microservicio se
+levanta y orquesta de forma independiente, sin una capa de enrutamiento y políticas transversales
+(limitación de tasa, agregación de respuestas) centralizada.

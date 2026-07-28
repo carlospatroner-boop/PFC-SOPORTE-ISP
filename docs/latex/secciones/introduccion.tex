@@ -1,0 +1,62 @@
+\section{Introducción}
+\label{sec:introduccion}
+
+\subsection{Continuidad del proyecto}
+
+El Sistema de Gestión de Solicitudes de Soporte Técnico de Internet es el proyecto final de
+carrera del equipo ACC para la asignatura de Aplicaciones Distribuidas. En la Entrega 1 se
+definió el dominio del problema —un proveedor de servicios de Internet (ISP) que necesita
+registrar, clasificar, asignar y dar seguimiento a solicitudes de soporte técnico de sus
+clientes— y se construyó un primer prototipo monolítico con comunicación por \emph{sockets}. En
+la Entrega 2 el sistema se descompuso en cinco microservicios independientes
+(\texttt{auth-service}, \texttt{ticket-service}, \texttt{ai-service}, \texttt{notification-service}
+y \texttt{report-service}), comunicados mediante REST y eventos asíncronos sobre Apache Kafka, con
+autenticación y autorización por rol basada en JWT~\cite{jones2015jwt} siguiendo los principios de
+diseño orientado a recursos de Fielding~\cite{fielding2000rest} y las prácticas de descomposición
+de servicios descritas por Newman~\cite{newman2021microservices}.
+
+La Entrega 3, cubierta por este documento, profundiza en dos dimensiones que las entregas
+anteriores dejaron abiertas: (i) el comportamiento de la capa de datos bajo fragmentación
+horizontal real y su tolerancia a fallos de nodo, y (ii) el procesamiento analítico paralelo de
+volúmenes de datos que superan lo que un solo proceso puede manejar con margen razonable de
+tiempo. Ambas dimensiones se abordan sobre la misma base de código de la Entrega 2, no como un
+sistema nuevo: los cambios de esquema, el rediseño de \texttt{ticket-service} y el pipeline de
+Spark se integran con los microservicios y el flujo de eventos ya existentes.
+
+\subsection{Objetivos de la Entrega 3}
+
+\begin{itemize}[leftmargin=1.5em]
+    \item Fragmentar horizontalmente la tabla de mayor cardinalidad del sistema
+        (\texttt{tickets}) sobre un clúster real de CockroachDB de tres nodos, aplicando el
+        criterio de fragmentación exigido para el equipo ACC (\texttt{fecha\_apertura}), y
+        verificar formalmente su corrección.
+    \item Medir y documentar el comportamiento del clúster ante la pérdida de uno y dos nodos,
+        incluyendo latencia de escritura/lectura y disponibilidad efectiva del servicio.
+    \item Instrumentar el servicio de datos con métricas operativas (Prometheus/Micrometer) y
+        pruebas de integración reproducibles contra una instancia real de la base de datos
+        (Testcontainers), evitando que la corrección del sistema dependa únicamente de
+        inspección manual.
+    \item Diseñar e implementar un pipeline de procesamiento paralelo sobre Apache Spark que
+        aplique las cinco categorías de transformación exigidas por la guía de la asignatura
+        sobre un conjunto de datos de al menos 500{,}000 registros, orientado a un objetivo
+        analítico propio del dominio del equipo: reincidencia de clientes y agrupamiento de
+        incidencias.
+    \item Diseñar y ejecutar un protocolo experimental formal que contraste el rendimiento del
+        pipeline paralelo contra un baseline secuencial equivalente, con análisis estadístico de
+        significancia, y que caracterice la ley de Amdahl~\cite{amdahl1967validity} observada en
+        el propio pipeline.
+\end{itemize}
+
+\subsection{Estructura del documento}
+
+La Sección~\ref{sec:trabajos-relacionados} sitúa las decisiones de diseño de este trabajo frente a
+la literatura de bases de datos distribuidas y procesamiento paralelo de datos. La
+Sección~\ref{sec:fundamento-teorico} resume los fundamentos teóricos aplicados: teoremas de
+fragmentación, consistencia distribuida y las leyes de escalabilidad paralela. La
+Sección~\ref{sec:diseno-esquema} documenta el rediseño del esquema y la política de fragmentación.
+La Sección~\ref{sec:cluster-verificacion} presenta la verificación empírica del clúster: pruebas
+de integración, métricas e instrumentación, y los resultados de tolerancia a fallos. La
+Sección~\ref{sec:pipeline-paralelo} describe el pipeline de Spark y sus cinco transformaciones. La
+Sección~\ref{sec:protocolo-resultados} presenta el protocolo experimental y sus resultados. La
+Sección~\ref{sec:discusion} discute las limitaciones y \emph{trade-offs} del diseño, y la
+Sección~\ref{sec:conclusiones} cierra con las conclusiones y el trabajo futuro.

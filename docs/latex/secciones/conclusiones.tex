@@ -1,0 +1,74 @@
+\section{Conclusiones e integración con E4}
+\label{sec:conclusiones}
+
+Este trabajo abordó dos dimensiones de la Entrega 3 sobre la base de código de microservicios
+construida en entregas anteriores: la fragmentación horizontal correcta y verificable de la capa
+de datos, y el procesamiento analítico paralelo de un volumen de datos que excede lo razonable
+para un solo proceso. Sobre la primera dimensión, se rediseñó la tabla \texttt{tickets} de un
+esquema fragmentado por zona geográfica a uno fragmentado por rango de \texttt{fecha\_apertura},
+verificando formalmente las tres condiciones de corrección de toda fragmentación horizontal
+—completitud, reconstrucción y disyunción— y documentando explícitamente, en vez de ocultar, los
+\emph{trade-offs} aceptados: degradación de las consultas por zona a \emph{scatter-gather} sobre
+cuatro particiones, y la imposibilidad de colocalización física con la tabla de clientes por
+pertenecer a un microservicio distinto. La corrección del comportamiento transaccional del clúster
+—en particular, el rechazo explícito de escrituras concurrentes conflictivas propio del aislamiento
+\texttt{SERIALIZABLE}— se verificó empíricamente contra una instancia real de CockroachDB mediante
+Testcontainers, no mediante inspección manual ni simulación, y se instrumentó con métricas
+Prometheus validadas sin advertencias por el \emph{linter} oficial de la herramienta.
+
+Sobre la segunda dimensión, se implementó un pipeline de Apache Spark con las cinco categorías de
+transformación exigidas, aplicadas de forma coherente a un objetivo analítico propio del dominio
+—reincidencia de clientes y agrupamiento de incidencias por texto y zona— y ejecutado de extremo a
+extremo sobre un conjunto sintético de 600{,}000 registros con resultados reproducibles y no
+triviales: 68.3\% de reincidencia detectada dentro de una ventana de 30 días y una distribución de
+\emph{clusters} no degenerada. Siguiendo metodología estándar de experimentación en ingeniería de
+software, se ejecutó además un protocolo formal de 50 corridas contrastando este pipeline contra un
+baseline secuencial en pandas, con un resultado que no era el esperado y que precisamente por eso
+es valioso: para este volumen de datos, el baseline secuencial resultó significativamente más
+rápido que Spark incluso en su configuración de mayor paralelismo
+($p \approx 5\times10^{-10}$), aunque Spark sí exhibe un \emph{speedup} interno real al escalar de
+uno a ocho núcleos (ajuste de Amdahl $p \approx 0.53$). Reportar este resultado tal como ocurrió,
+en vez de solo buscar el resultado que confirmara la hipótesis inicial, es coherente con el
+principio de honestidad aplicado en todo este documento.
+
+El único resultado numérico que depende de una ejecución prolongada y de coordinación logística del
+equipo que sigue sin ejecutarse es la caracterización de tolerancia a fallos ante la caída de uno y
+dos nodos: se documenta en este trabajo con su diseño e implementación completos, pero su valor
+numérico final se reporta como pendiente de la ejecución programada para el cierre de esta entrega,
+en línea con el compromiso de no sustituir mediciones reales por estimaciones a lo largo de todo el
+documento.
+
+\subsection{Integración con la Entrega 4}
+
+Siguiendo el principio de complementariedad E3→E4 de la guía de esta entrega —todo artefacto
+producido en E3 debe reutilizarse, ampliarse o instrumentarse en E4, no descartarse—, los
+siguientes artefactos quedan disponibles para consumo directo en el siguiente ciclo:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{El esquema de base de datos fragmentado} (\texttt{db-cluster/scripts/init\_db.sql},
+        ADR-0003) y el propio \textbf{clúster de tres nodos de CockroachDB} quedan como la capa de
+        persistencia definitiva del sistema: E4 no necesita rediseñar ni migrar datos, solo construir
+        sobre ella la interfaz web, la interfaz móvil y la observabilidad exigidas en el siguiente
+        ciclo.
+    \item \textbf{Las tres métricas Prometheus} instrumentadas en la
+        Sección~\ref{sec:cluster-verificacion} (\texttt{crdb\_query\_duration\_seconds},
+        \texttt{crdb\_transaction\_retries\_total}, \texttt{crdb\_pool\_active\_connections}) se
+        emplean tal cual, sin modificación, como fuente de datos del panel de observabilidad
+        consolidado que exige E4 —por eso se instrumentaron en esta entrega y no se aplazaron.
+    \item \textbf{Las pruebas de integración con Testcontainers} quedan incorporadas a la suite de
+        pruebas del proyecto como regresión permanente: cualquier cambio futuro sobre
+        \texttt{ticket-service} en E4 se sigue verificando contra una instancia real de CockroachDB,
+        no contra una base embebida.
+    \item \textbf{El pipeline de Spark y el protocolo experimental} (\texttt{spark/src/pipeline.py},
+        \texttt{baseline.py}, \texttt{protocol\_experiment.py}) quedan como la base analítica
+        reutilizable: E4 puede extenderlos con nuevas transformaciones o exponer sus resultados
+        (reincidencia, \emph{clusters} de incidencias) a través de la interfaz de usuario, sin
+        rehacer la integración JDBC ni el diseño experimental ya validado aquí.
+\end{itemize}
+
+Como trabajo futuro más allá de lo directamente heredable por E4, se identifican dos líneas
+adicionales: una estrategia de fragmentación compuesta que preserve el beneficio de poda de
+particiones tanto para consultas temporales como para consultas por zona, y la validación del
+pipeline analítico sobre un conjunto de datos real de incidencias de un ISP, para contrastar la
+representatividad del dataset sintético usado en esta entrega frente a la distribución real de
+texto y de cardinalidad de clientes del dominio.

@@ -1,0 +1,60 @@
+\section{Trabajos relacionados}
+\label{sec:trabajos-relacionados}
+
+\subsection{Bases de datos distribuidas y consistencia}
+
+CockroachDB es una base de datos SQL distribuida diseñada para tolerar la pérdida de nodos y
+regiones enteras sin intervención manual, replicando cada rango de datos mediante el protocolo de
+consenso Raft~\cite{ongaro2014raft} y garantizando aislamiento \texttt{SERIALIZABLE} de extremo a
+extremo mediante un protocolo de \emph{timestamps} y reintentos transaccionales
+transparentes~\cite{taft2020cockroachdb}. Esta decisión de diseño —consistencia fuerte por
+defecto, en vez de consistencia eventual configurable— la sitúa, en el espacio de \emph{trade-offs}
+descrito por el teorema CAP~\cite{brewer2012cap} y su refinamiento
+PACELC~\cite{abadi2012consistency}, del lado de la consistencia incluso a costa de latencia
+adicional en el caso de conflicto, algo directamente observable en las pruebas de integración de
+la Sección~\ref{sec:cluster-verificacion}: dos transacciones concurrentes sobre la misma fila no
+producen un resultado silenciosamente inconsistente, sino un error de conflicto explícito
+(\texttt{SQLSTATE 40001}) que la aplicación debe reintentar. Esta elección es consistente con el
+dominio del problema: un sistema de tickets de soporte no puede permitirse que dos actualizaciones
+concurrentes sobre el mismo ticket (por ejemplo, un técnico cerrándolo mientras un administrador lo
+reasigna) se resuelvan de forma silenciosamente incorrecta.
+
+La fragmentación horizontal aplicada en este trabajo se apoya en el marco teórico clásico de
+Özsu y Valduriez~\cite{ozsu2011principles}, que exige que toda fragmentación cumpla completitud,
+reconstrucción y disyunción (verificado formalmente en la Sección~\ref{sec:diseno-esquema}). A
+diferencia de sistemas NoSQL de consistencia eventual descritos en el mismo texto, CockroachDB
+mantiene semántica SQL completa y transacciones ACID distribuidas, lo que permitió mantener sin
+cambios la capa de persistencia JPA de \texttt{ticket-service} —solo cambió la definición de la
+clave primaria y la estrategia de acceso, no el modelo transaccional de la aplicación.
+
+\subsection{Procesamiento paralelo de datos}
+
+El pipeline analítico de este trabajo se construye sobre el modelo de \emph{Resilient Distributed
+Datasets} (RDD) de Apache Spark~\cite{zaharia2012rdd}, que generaliza el modelo MapReduce
+permitiendo mantener conjuntos de datos intermedios en memoria entre etapas —esencial para un
+pipeline de cinco transformaciones encadenadas como el descrito en la
+Sección~\ref{sec:pipeline-paralelo}, donde recomputar cada etapa desde disco habría anulado buena
+parte de la ganancia de paralelismo—. Salloum et al.~\cite{salloum2016bigdata} documentan
+precisamente esta ventaja de Spark frente a MapReduce clásico para cargas de trabajo iterativas y
+de aprendizaje automático, que es el caso de la etapa de \emph{clustering} (T5) de este pipeline.
+La guía de referencia de Chambers y Zaharia~\cite{chambers2018spark} se usó como referencia práctica
+para la API de \texttt{DataFrame} y \texttt{pyspark.ml} empleada en \texttt{transformations.py}.
+
+Para el protocolo de medición de rendimiento, el antecedente directo es el trabajo de
+Cooper et al.~\cite{cooper2010ycsb} sobre \emph{benchmarking} sistemático de sistemas de
+almacenamiento en la nube (YCSB), cuyo principio metodológico central —repeticiones controladas,
+descarte de efectos de arranque en frío, y comparación contra una línea base conocida— se adapta en
+este trabajo al protocolo experimental de la Sección~\ref{sec:protocolo-resultados}, aunque aquí el
+objeto de medición es un pipeline analítico completo y no operaciones individuales de
+lectura/escritura.
+
+\subsection{Metodología experimental}
+
+El diseño del protocolo experimental (variables independientes y dependientes, repeticiones,
+descarte de calentamiento/enfriamiento, prueba de normalidad seguida de prueba paramétrica o no
+paramétrica según corresponda) sigue las guías de Wohlin et al.~\cite{wohlin2012experimentation}
+y los principios de diseño de experimentos de sistemas de Jain~\cite{jain1991art}. El uso del caso
+de estudio del propio sistema como unidad de análisis, y la forma de reportar las amenazas a la
+validez interna y externa en la Sección~\ref{sec:protocolo-resultados}, siguen las recomendaciones
+de Runeson y Höst~\cite{runeson2009guidelines} para investigación de estudios de caso en ingeniería
+de software.

@@ -1,0 +1,1054 @@
+\documentclass[11pt,letterpaper]{article}
+
+% ---------- Paquetes ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{float}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    citecolor=blue!50!black,
+    urlcolor=blue!50!black,
+    pdftitle={Capa de datos distribuida y pipeline analitico paralelo - Equipo ACC},
+    pdfauthor={Carlos Carpio, Cristhian Pacheco, Robinson Cando, Jeremy Alvarez}
+}
+
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{codecomment}{RGB}{100,100,100}
+\definecolor{codekeyword}{RGB}{0,0,180}
+\definecolor{codestring}{RGB}{160,30,30}
+
+\lstdefinestyle{codigo}{
+    backgroundcolor=\color{codebg},
+    commentstyle=\color{codecomment}\itshape,
+    keywordstyle=\color{codekeyword}\bfseries,
+    stringstyle=\color{codestring},
+    basicstyle=\footnotesize\ttfamily,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    numberstyle=\tiny\color{codecomment},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{black!20}
+}
+\lstset{style=codigo}
+
+\newcommand{\seccionpagref}[1]{} % placeholder, no-op
+
+\title{\textbf{Capa de datos distribuida y pipeline anal\'itico paralelo}\\
+\large Sistema de Gesti\'on de Solicitudes de Soporte T\'ecnico de Internet\\
+\large Entrega 3 --- Aplicaciones Distribuidas (ISR-701)}
+
+\author{
+Carlos Jos\'e Carpio Mendoza \and
+Cristhian Daniel Pacheco C\'ardenas \and
+Robinson Rodrigo Cando Moreno \and
+Jeremy \'Alvarez\\[1em]
+\normalsize Equipo ACC\\
+\normalsize Facultad de Ciencias de la Computaci\'on\\
+\normalsize Universidad T\'ecnica Estatal de Quevedo
+}
+
+\date{Julio 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+\textbf{Objetivo.} Consolidar la capa de datos distribuida y el pipeline analítico paralelo del
+Sistema de Soporte Técnico ISP (equipo ACC), integrándolos con los microservicios de la Entrega 2
+y evaluando su rendimiento y tolerancia a fallos. \textbf{Método.} Se fragmentó horizontalmente \texttt{tickets} por rango de
+\texttt{fecha\_apertura} sobre un clúster de tres nodos de CockroachDB, verificando formalmente
+completitud, reconstrucción y disyunción~\cite{ozsu2011principles}; se instrumentó el servicio con
+métricas Prometheus validadas con \texttt{promtool} y con pruebas Testcontainers que ejercitan el
+aislamiento \texttt{SERIALIZABLE} contra una instancia real; y se rediseñó un pipeline de Apache
+Spark sobre 600{,}000 incidencias sintéticas con cinco transformaciones orientadas a reincidencia
+y agrupamiento, contrastado con un protocolo experimental
+(Jain~\cite{jain1991art}, Wohlin et al.~\cite{wohlin2012experimentation}) frente a un baseline
+secuencial en pandas.
+\textbf{Resultados.} El clúster aplica correctamente aislamiento serializable ante escrituras
+concurrentes conflictivas (\texttt{SQLSTATE 40001}), las tres métricas pasan el \emph{linter} de
+Prometheus sin advertencias, y el pipeline detecta 380{,}753 incidencias reincidentes (68.3\%)
+sobre 557{,}701 filas filtradas con una distribución de \emph{clusters} no degenerada. La
+tolerancia a fallos y el protocolo estadístico completo (50 corridas) están diseñados e
+implementados, pendientes de su ejecución final. \textbf{Conclusión.} La fragmentación por fecha
+y la instrumentación aplicadas son correctas y verificables empíricamente, con un costo aceptado
+y documentado en las consultas por zona geográfica.
+\end{abstract}
+
+\begin{center}\textbf{Abstract}\end{center}
+\begin{abstract}
+\noindent
+\textbf{Objective.} To consolidate the distributed data layer and the parallel analytics pipeline
+of the ISP Technical Support Ticket Management System (team ACC), integrating them with the
+microservice architecture built in Delivery 2, and to experimentally evaluate their performance
+and fault tolerance. \textbf{Method.} The \texttt{tickets} table was horizontally fragmented by
+range on \texttt{fecha\_apertura} over a three-node CockroachDB cluster, with formal verification
+of completeness, reconstruction and disjointness~\cite{ozsu2011principles}; the service was
+instrumented with Prometheus metrics validated with \texttt{promtool} and with Testcontainers
+integration tests exercising \texttt{SERIALIZABLE} isolation against a real instance; and an
+Apache Spark pipeline was redesigned over 600,000 synthetic incidents with five transformations
+targeting customer recurrence and incident clustering, contrasted through a formal experimental
+protocol against a sequential pandas baseline. \textbf{Results.} The cluster correctly enforces
+serializable isolation under conflicting concurrent writes (\texttt{SQLSTATE 40001}), all three
+required metrics pass the Prometheus linter without warnings, and the pipeline detects 380,753
+recurring incidents (68.3\%) out of 557,701 filtered rows with a non-degenerate cluster
+distribution. Fault-tolerance characterization and the full statistical protocol run (50 trials)
+are documented with complete design, pending the final execution session. \textbf{Conclusion.}
+The date-based fragmentation and instrumentation applied are correct and empirically verifiable,
+although they introduce an accepted, documented cost on zone-filtered queries.
+\end{abstract}
+
+
+\tableofcontents
+\newpage
+
+\section{Introducción}
+\label{sec:introduccion}
+
+\subsection{Continuidad del proyecto}
+
+El Sistema de Gestión de Solicitudes de Soporte Técnico de Internet es el proyecto final de
+carrera del equipo ACC para la asignatura de Aplicaciones Distribuidas. En la Entrega 1 se
+definió el dominio del problema —un proveedor de servicios de Internet (ISP) que necesita
+registrar, clasificar, asignar y dar seguimiento a solicitudes de soporte técnico de sus
+clientes— y se construyó un primer prototipo monolítico con comunicación por \emph{sockets}. En
+la Entrega 2 el sistema se descompuso en cinco microservicios independientes
+(\texttt{auth-service}, \texttt{ticket-service}, \texttt{ai-service}, \texttt{notification-service}
+y \texttt{report-service}), comunicados mediante REST y eventos asíncronos sobre Apache Kafka, con
+autenticación y autorización por rol basada en JWT~\cite{jones2015jwt} siguiendo los principios de
+diseño orientado a recursos de Fielding~\cite{fielding2000rest} y las prácticas de descomposición
+de servicios descritas por Newman~\cite{newman2021microservices}.
+
+La Entrega 3, cubierta por este documento, profundiza en dos dimensiones que las entregas
+anteriores dejaron abiertas: (i) el comportamiento de la capa de datos bajo fragmentación
+horizontal real y su tolerancia a fallos de nodo, y (ii) el procesamiento analítico paralelo de
+volúmenes de datos que superan lo que un solo proceso puede manejar con margen razonable de
+tiempo. Ambas dimensiones se abordan sobre la misma base de código de la Entrega 2, no como un
+sistema nuevo: los cambios de esquema, el rediseño de \texttt{ticket-service} y el pipeline de
+Spark se integran con los microservicios y el flujo de eventos ya existentes.
+
+\subsection{Objetivos de la Entrega 3}
+
+\begin{itemize}[leftmargin=1.5em]
+    \item Fragmentar horizontalmente la tabla de mayor cardinalidad del sistema
+        (\texttt{tickets}) sobre un clúster real de CockroachDB de tres nodos, aplicando el
+        criterio de fragmentación exigido para el equipo ACC (\texttt{fecha\_apertura}), y
+        verificar formalmente su corrección.
+    \item Medir y documentar el comportamiento del clúster ante la pérdida de uno y dos nodos,
+        incluyendo latencia de escritura/lectura y disponibilidad efectiva del servicio.
+    \item Instrumentar el servicio de datos con métricas operativas (Prometheus/Micrometer) y
+        pruebas de integración reproducibles contra una instancia real de la base de datos
+        (Testcontainers), evitando que la corrección del sistema dependa únicamente de
+        inspección manual.
+    \item Diseñar e implementar un pipeline de procesamiento paralelo sobre Apache Spark que
+        aplique las cinco categorías de transformación exigidas por la guía de la asignatura
+        sobre un conjunto de datos de al menos 500{,}000 registros, orientado a un objetivo
+        analítico propio del dominio del equipo: reincidencia de clientes y agrupamiento de
+        incidencias.
+    \item Diseñar y ejecutar un protocolo experimental formal que contraste el rendimiento del
+        pipeline paralelo contra un baseline secuencial equivalente, con análisis estadístico de
+        significancia, y que caracterice la ley de Amdahl~\cite{amdahl1967validity} observada en
+        el propio pipeline.
+\end{itemize}
+
+\subsection{Estructura del documento}
+
+La Sección~\ref{sec:trabajos-relacionados} sitúa las decisiones de diseño de este trabajo frente a
+la literatura de bases de datos distribuidas y procesamiento paralelo de datos. La
+Sección~\ref{sec:fundamento-teorico} resume los fundamentos teóricos aplicados: teoremas de
+fragmentación, consistencia distribuida y las leyes de escalabilidad paralela. La
+Sección~\ref{sec:diseno-esquema} documenta el rediseño del esquema y la política de fragmentación.
+La Sección~\ref{sec:cluster-verificacion} presenta la verificación empírica del clúster: pruebas
+de integración, métricas e instrumentación, y los resultados de tolerancia a fallos. La
+Sección~\ref{sec:pipeline-paralelo} describe el pipeline de Spark y sus cinco transformaciones. La
+Sección~\ref{sec:protocolo-resultados} presenta el protocolo experimental y sus resultados. La
+Sección~\ref{sec:discusion} discute las limitaciones y \emph{trade-offs} del diseño, y la
+Sección~\ref{sec:conclusiones} cierra con las conclusiones y el trabajo futuro.
+
+\section{Trabajos relacionados}
+\label{sec:trabajos-relacionados}
+
+\subsection{Bases de datos distribuidas y consistencia}
+
+CockroachDB es una base de datos SQL distribuida diseñada para tolerar la pérdida de nodos y
+regiones enteras sin intervención manual, replicando cada rango de datos mediante el protocolo de
+consenso Raft~\cite{ongaro2014raft} y garantizando aislamiento \texttt{SERIALIZABLE} de extremo a
+extremo mediante un protocolo de \emph{timestamps} y reintentos transaccionales
+transparentes~\cite{taft2020cockroachdb}. Esta decisión de diseño —consistencia fuerte por
+defecto, en vez de consistencia eventual configurable— la sitúa, en el espacio de \emph{trade-offs}
+descrito por el teorema CAP~\cite{brewer2012cap} y su refinamiento
+PACELC~\cite{abadi2012consistency}, del lado de la consistencia incluso a costa de latencia
+adicional en el caso de conflicto, algo directamente observable en las pruebas de integración de
+la Sección~\ref{sec:cluster-verificacion}: dos transacciones concurrentes sobre la misma fila no
+producen un resultado silenciosamente inconsistente, sino un error de conflicto explícito
+(\texttt{SQLSTATE 40001}) que la aplicación debe reintentar. Esta elección es consistente con el
+dominio del problema: un sistema de tickets de soporte no puede permitirse que dos actualizaciones
+concurrentes sobre el mismo ticket (por ejemplo, un técnico cerrándolo mientras un administrador lo
+reasigna) se resuelvan de forma silenciosamente incorrecta.
+
+La fragmentación horizontal aplicada en este trabajo se apoya en el marco teórico clásico de
+Özsu y Valduriez~\cite{ozsu2011principles}, que exige que toda fragmentación cumpla completitud,
+reconstrucción y disyunción (verificado formalmente en la Sección~\ref{sec:diseno-esquema}). A
+diferencia de sistemas NoSQL de consistencia eventual descritos en el mismo texto, CockroachDB
+mantiene semántica SQL completa y transacciones ACID distribuidas, lo que permitió mantener sin
+cambios la capa de persistencia JPA de \texttt{ticket-service} —solo cambió la definición de la
+clave primaria y la estrategia de acceso, no el modelo transaccional de la aplicación.
+
+\subsection{Procesamiento paralelo de datos}
+
+El pipeline analítico de este trabajo se construye sobre el modelo de \emph{Resilient Distributed
+Datasets} (RDD) de Apache Spark~\cite{zaharia2012rdd}, que generaliza el modelo MapReduce
+permitiendo mantener conjuntos de datos intermedios en memoria entre etapas —esencial para un
+pipeline de cinco transformaciones encadenadas como el descrito en la
+Sección~\ref{sec:pipeline-paralelo}, donde recomputar cada etapa desde disco habría anulado buena
+parte de la ganancia de paralelismo—. Salloum et al.~\cite{salloum2016bigdata} documentan
+precisamente esta ventaja de Spark frente a MapReduce clásico para cargas de trabajo iterativas y
+de aprendizaje automático, que es el caso de la etapa de \emph{clustering} (T5) de este pipeline.
+La guía de referencia de Chambers y Zaharia~\cite{chambers2018spark} se usó como referencia práctica
+para la API de \texttt{DataFrame} y \texttt{pyspark.ml} empleada en \texttt{transformations.py}.
+
+Para el protocolo de medición de rendimiento, el antecedente directo es el trabajo de
+Cooper et al.~\cite{cooper2010ycsb} sobre \emph{benchmarking} sistemático de sistemas de
+almacenamiento en la nube (YCSB), cuyo principio metodológico central —repeticiones controladas,
+descarte de efectos de arranque en frío, y comparación contra una línea base conocida— se adapta en
+este trabajo al protocolo experimental de la Sección~\ref{sec:protocolo-resultados}, aunque aquí el
+objeto de medición es un pipeline analítico completo y no operaciones individuales de
+lectura/escritura.
+
+\subsection{Metodología experimental}
+
+El diseño del protocolo experimental (variables independientes y dependientes, repeticiones,
+descarte de calentamiento/enfriamiento, prueba de normalidad seguida de prueba paramétrica o no
+paramétrica según corresponda) sigue las guías de Wohlin et al.~\cite{wohlin2012experimentation}
+y los principios de diseño de experimentos de sistemas de Jain~\cite{jain1991art}. El uso del caso
+de estudio del propio sistema como unidad de análisis, y la forma de reportar las amenazas a la
+validez interna y externa en la Sección~\ref{sec:protocolo-resultados}, siguen las recomendaciones
+de Runeson y Höst~\cite{runeson2009guidelines} para investigación de estudios de caso en ingeniería
+de software.
+
+\section{Fundamento teórico}
+\label{sec:fundamento-teorico}
+
+\subsection{Modelo de bases de datos distribuidas}
+
+Siguiendo a Özsu y Valduriez~\cite{ozsu2011principles}, un sistema de base de datos distribuido
+(SBDD) se define como un conjunto de múltiples bases de datos lógicamente relacionadas,
+gestionadas por un único sistema y percibidas por el usuario final como una única base. Un SBDD
+persigue cuatro objetivos de diseño: \emph{transparencia} (de fragmentación, de replicación y de
+ubicación —el usuario no necesita saber dónde ni cómo se almacena físicamente cada fila—),
+\emph{autonomía local} de cada nodo, \emph{disponibilidad} ante fallos parciales, y
+\emph{escalabilidad horizontal} mediante la adición de nodos en vez de hardware más potente en un
+único nodo.
+
+La \emph{fragmentación horizontal} de una relación $R$ produce fragmentos $R_1, R_2, \dots, R_n$
+mediante selección sobre un atributo particionador: $R_i = \sigma_{p_i}(R)$, donde $\{p_i\}$ es un
+conjunto de predicados mutuamente excluyentes y colectivamente exhaustivos. Esta fragmentación es
+correcta si y solo si cumple tres condiciones:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Completitud}: todo elemento de $R$ pertenece a al menos un fragmento $R_i$.
+    \item \textbf{Reconstrucción}: $R = \bigcup_{i=1}^{n} R_i$, es decir, la unión de los
+        fragmentos reproduce exactamente la relación original.
+    \item \textbf{Disyunción}: $R_i \cap R_j = \emptyset$ para todo $i \neq j$, es decir, ningún
+        elemento pertenece a más de un fragmento.
+\end{itemize}
+
+Para una fragmentación por rango sobre un atributo $a$ con dominio totalmente ordenado, estas tres
+condiciones se satisfacen definiendo $n$ puntos de corte $c_0 = -\infty < c_1 < \dots < c_{n-1} <
+c_n = +\infty$ y cada fragmento como $R_i = \sigma_{c_{i-1} \leq a < c_i}(R)$: la completitud se
+sigue de que el dominio de $a$ está cubierto en su totalidad por los intervalos, la disyunción de
+que los intervalos son semiabiertos y consecutivos sin solape, y la reconstrucción de que la unión
+de predicados semiabiertos consecutivos es la tautología sobre el dominio de $a$. La
+Sección~\ref{sec:diseno-esquema} instancia este esquema con $a = \texttt{created\_at}$, $n = 4$ y
+verifica explícitamente las tres condiciones para el caso concreto del equipo.
+
+La \emph{replicación} complementa a la fragmentación para lograr disponibilidad: con un factor de
+replicación $f \geq 3$, un sistema tolera la pérdida simultánea de hasta
+$\lfloor (f-1)/2 \rfloor$ réplicas por rango de datos, siempre que se mantenga el quórum de
+escritura $\lceil f/2 \rceil + 1$. Con $f = 3$ (el valor usado en este despliegue), el quórum de
+escritura es 2 y la tolerancia es de 1 réplica: el clúster admite la caída de exactamente un nodo
+sin perder disponibilidad de escritura, pero no la de dos simultáneamente. Esta aritmética de
+quórum es la que se contrasta empíricamente en la Sección~\ref{sec:cluster-verificacion}.
+
+\subsection{Teorema CAP y modelo PACELC}
+
+El teorema CAP~\cite{brewer2012cap} establece que, ante una partición de red ($P$), un sistema
+distribuido no puede garantizar simultáneamente consistencia ($C$) y disponibilidad ($A$).
+Abadi~\cite{abadi2012consistency} extiende esta caracterización con PACELC, señalando que incluso
+en ausencia de partición ($E$, \emph{else}) todo sistema distribuido enfrenta un segundo
+\emph{trade-off} entre latencia ($L$) y consistencia ($C$). CockroachDB se posiciona
+explícitamente como un sistema PC/EC: prioriza consistencia sobre disponibilidad ante partición, y
+consistencia sobre latencia en operación normal, lo que se manifiesta de forma concreta en el
+comportamiento observado durante el incidente operativo documentado en la
+Sección~\ref{sec:cluster-verificacion} (rechazo de escrituras concurrentes conflictivas en vez de
+aceptarlas y arriesgar una lectura inconsistente posterior).
+
+Como resume Kleppmann~\cite{kleppmann2017ddia} en su tratamiento de sistemas de datos distribuidos
+modernos, la elección entre consistencia y disponibilidad no es una propiedad binaria del sistema
+completo, sino una decisión de diseño que puede —y en sistemas como CockroachDB, debe— tomarse de
+forma explícita y documentada para cada tipo de operación.
+
+\subsection{Consenso distribuido: Raft}
+
+El algoritmo Raft~\cite{ongaro2014raft} descompone el problema del consenso distribuido en tres
+subproblemas: \emph{elección de líder}, \emph{replicación de logs} y \emph{seguridad}
+(\emph{safety}). En CockroachDB, cada rango de datos constituye un grupo Raft independiente con su
+propio líder: una escritura se considera comprometida (\emph{committed}) cuando el líder del rango
+recibe confirmación de una mayoría estricta de sus réplicas, garantizando durabilidad frente a la
+caída de una minoría de nodos. Con el factor de replicación $f=3$ de la
+Sección~\ref{sec:fundamento-teorico} (quórum de escritura 2 de 3), esto explica directamente por
+qué el clúster tolera la caída de un nodo sin pérdida de disponibilidad de escritura, pero no la
+de dos nodos simultáneamente —ya no existe mayoría posible entre el único nodo restante—,
+comportamiento que se contrasta con la medición empírica de la
+Sección~\ref{sec:cluster-verificacion}.
+
+\subsection{Modelo de programación paralela}
+
+El modelo RDD (\emph{Resilient Distributed Dataset}) de Apache Spark~\cite{zaharia2012rdd} abstrae
+una colección distribuida \textbf{inmutable}, con \textbf{linaje} (\emph{lineage}) de
+transformaciones registrado en vez de los datos materializados en cada etapa intermedia,
+\textbf{evaluación perezosa} (\emph{lazy evaluation}, las transformaciones no se ejecutan hasta que
+una acción las requiere) y \textbf{tolerancia a fallos mediante recómputo}: si una partición se
+pierde, Spark la reconstruye reaplicando su linaje de transformaciones sobre los datos de origen,
+en vez de depender de una copia de respaldo replicada. Esta abstracción es la que sustenta el
+pipeline de la Sección~\ref{sec:pipeline-paralelo}, encadenando cinco transformaciones sin
+materializar resultados intermedios en disco entre cada una.
+
+La ganancia de paralelismo del pipeline se interpreta bajo dos modelos complementarios. La ley de
+Amdahl~\cite{amdahl1967validity} modela el \emph{speedup} $S(N)$ alcanzable con $N$ unidades de
+procesamiento para un problema de \textbf{tamaño fijo}, en función de la fracción $p$ del trabajo
+que es paralelizable:
+
+\begin{equation}
+    S(N) = \frac{1}{(1-p) + \dfrac{p}{N}}, \qquad \lim_{N \to \infty} S(N) = \frac{1}{1-p}
+    \label{eq:amdahl}
+\end{equation}
+
+La Ecuación~\ref{eq:amdahl} predice un límite asintótico de \emph{speedup} determinado
+enteramente por la fracción secuencial $(1-p)$ del pipeline —en este caso, principalmente la
+lectura inicial de Parquet y la escritura final de resultados, que no se benefician de más
+particiones más allá de cierto punto—. Gustafson~\cite{gustafson1988reevaluating} señala que esta
+formulación asume tamaño de problema constante, y propone en cambio fijar el tiempo total
+disponible y dejar crecer el tamaño del problema con $N$; bajo ese supuesto el \emph{speedup}
+escala de forma aproximadamente lineal en $N$ en vez de saturar. Ambos modelos se aplican en la
+Sección~\ref{sec:protocolo-resultados}: Amdahl para ajustar la fracción paralelizable observada
+del pipeline concreto (tamaño de dataset fijo en 600{,}000 filas para todos los niveles de $N$),
+y Gustafson como marco de interpretación de por qué, en un caso de uso real de un ISP donde el
+volumen de datos crece con el tiempo (no es fijo), el beneficio práctico del paralelismo tiende a
+ser mayor que el que predice Amdahl en aislamiento.
+
+\subsection{Diseño y análisis estadístico del experimento}
+
+El contraste de hipótesis del protocolo experimental (Sección~\ref{sec:protocolo-resultados})
+sigue el procedimiento estándar para muestras pareadas descrito por Jain~\cite{jain1991art} y
+Wohlin et al.~\cite{wohlin2012experimentation}: dado que cada repetición del pipeline paralelo y
+del baseline secuencial se ejecuta sobre el mismo dataset y en la misma posición de la secuencia
+de repeticiones, las mediciones no son independientes entre grupos, por lo que corresponde una
+prueba pareada en vez de una prueba de dos muestras independientes. Antes de aplicar una prueba
+paramétrica (\emph{t} de Student pareada) es necesario verificar el supuesto de normalidad de las
+diferencias emparejadas; se usa la prueba de Shapiro–Wilk para ello, y en caso de rechazarse la
+normalidad ($p \leq 0.05$) se recurre a la alternativa no paramétrica estándar para datos
+pareados, la prueba de rangos con signo de Wilcoxon. El intervalo de confianza al 95\% de cada
+nivel se calcula como $\bar{t} \pm 1.96 \cdot s/\sqrt{r}$, válido asintóticamente por el teorema
+central del límite para $r \geq 8$ muestras por nivel tras el descarte de calentamiento y
+enfriamiento descrito en la Sección~\ref{sec:protocolo-resultados}.
+
+\section{Diseño del esquema y fragmentación}
+\label{sec:diseno-esquema}
+
+\subsection{Esquema físico}
+
+El diagrama entidad-relación completo de \texttt{ticket\_db} —la base propia de
+\texttt{ticket-service} dentro del clúster de tres nodos de CockroachDB— se documenta en
+\texttt{docs/diagrams/db-schema.md}. La tabla \texttt{tickets} es la de mayor cardinalidad y la
+única fragmentada; \texttt{technicians} es una dimensión pequeña que no requiere fragmentación. La
+Tabla~\ref{tab:esquema-tickets} detalla las columnas relevantes para la política de fragmentación.
+
+\begin{table}[H]
+\centering
+\caption{Columnas relevantes de \texttt{tickets} tras el rediseño de la Entrega 3}
+\label{tab:esquema-tickets}
+\begin{tabular}{@{}llp{6.5cm}@{}}
+\toprule
+\textbf{Columna} & \textbf{Tipo} & \textbf{Rol} \\
+\midrule
+\texttt{created\_at} & \texttt{TIMESTAMPTZ} & Primer componente de la PK; columna de fragmentación \\
+\texttt{id}           & \texttt{UUID}        & Segundo componente de la PK; respaldado además por índice único \texttt{tickets\_id\_key} \\
+\texttt{zone}         & \texttt{STRING}      & Columna de negocio (RBAC de técnico, reportes); indexada, ya no es clave de fragmentación \\
+\texttt{client\_id}   & \texttt{UUID}        & Identidad del cliente, resuelta a nivel de aplicación vía JWT de \texttt{auth-service} \\
+\texttt{status}       & \texttt{STRING}      & Indexada (\texttt{idx\_tickets\_status}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Política de fragmentación}
+
+El fragmento del esquema en el Listado~\ref{lst:init-db} muestra la definición efectiva de la
+tabla \texttt{tickets} tal como se aplica en \texttt{db-cluster/scripts/init\_db.sql}.
+
+\begin{lstlisting}[language=SQL, caption={Fragmentación por rango de \texttt{tickets} (extracto de \texttt{init\_db.sql})}, label={lst:init-db}]
+CREATE TABLE IF NOT EXISTS tickets (
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id              UUID NOT NULL DEFAULT gen_random_uuid(),
+    zone            STRING NOT NULL,
+    client_id       UUID NOT NULL,
+    technician_id   UUID REFERENCES technicians(id),
+    category        STRING,
+    priority        STRING,
+    status          STRING NOT NULL DEFAULT 'NUEVO',
+    description     STRING,
+    sla_deadline    TIMESTAMPTZ,
+    resolved_at     TIMESTAMPTZ,
+    sla_breached    BOOL DEFAULT FALSE,
+    PRIMARY KEY (created_at, id)
+) PARTITION BY RANGE (created_at) (
+    PARTITION tickets_2026_q1 VALUES FROM (MINVALUE) TO ('2026-04-01T00:00:00Z'),
+    PARTITION tickets_2026_q2 VALUES FROM ('2026-04-01T00:00:00Z') TO ('2026-07-01T00:00:00Z'),
+    PARTITION tickets_2026_q3 VALUES FROM ('2026-07-01T00:00:00Z') TO ('2026-10-01T00:00:00Z'),
+    PARTITION tickets_2026_q4 VALUES FROM ('2026-10-01T00:00:00Z') TO (MAXVALUE)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS tickets_id_key ON tickets (id);
+CREATE INDEX IF NOT EXISTS idx_tickets_zone ON tickets (zone);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status);
+\end{lstlisting}
+
+Esta sintaxis sigue el mecanismo de particionamiento declarativo documentado oficialmente por
+Cockroach Labs~\cite{cockroachlabs2024docs}, que exige que la columna de partición sea el primer
+componente de la clave primaria para que el optimizador pueda aplicar poda de particiones
+(\emph{partition pruning}) en tiempo de planificación de consultas. Esta decisión reemplaza el
+diseño original de la Entrega 2, que fragmentaba \texttt{tickets} por
+zona geográfica (\texttt{PARTITION BY LIST (zone)}). El cambio fue motivado por un requisito
+explícito y no negociable de la guía oficial de la Entrega 3 para el equipo ACC: fragmentación
+horizontal de \texttt{tickets} por \texttt{fecha\_apertura}. El razonamiento completo de este
+cambio, incluyendo los \emph{trade-offs} aceptados, se documenta en el ADR-0003
+(\texttt{docs/adr/0003-sharding-policy.md}) y se resume a continuación.
+
+\subsection{Verificación formal de corrección}
+
+Con $a = \texttt{created\_at}$ y los cuatro puntos de corte del Listado~\ref{lst:init-db}
+($c_0 = \text{MINVALUE}$, $c_1 = \text{2026-04-01}$, $c_2 = \text{2026-07-01}$,
+$c_3 = \text{2026-10-01}$, $c_4 = \text{MAXVALUE}$), se verifican las tres condiciones del
+marco de Özsu y Valduriez~\cite{ozsu2011principles} introducidas en la
+Sección~\ref{sec:fundamento-teorico}:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Completitud}: la columna \texttt{created\_at} es \texttt{NOT NULL} con valor
+        por defecto \texttt{now()}, por lo que todo ticket tiene un valor definido de
+        \texttt{created\_at} y, en consecuencia, pertenece a exactamente una de las cuatro
+        particiones trimestrales.
+    \item \textbf{Reconstrucción}: los rangos
+        $[\text{MINVALUE}, c_1) \cup [c_1, c_2) \cup [c_2, c_3) \cup [c_3, \text{MAXVALUE})$
+        cubren la totalidad del dominio de \texttt{TIMESTAMPTZ}; la unión \texttt{UNION ALL} de
+        las cuatro particiones reconstruye exactamente la tabla \texttt{tickets} sin pérdida de
+        filas.
+    \item \textbf{Disyunción}: la semántica de \texttt{PARTITION BY RANGE} en CockroachDB define
+        cada límite como inclusivo por la izquierda y exclusivo por la derecha
+        (\texttt{VALUES FROM ... TO ...}); por construcción, ningún valor de \texttt{created\_at}
+        satisface simultáneamente los predicados de dos particiones distintas.
+\end{itemize}
+
+Adicionalmente, dado que \texttt{id} deja de ser autosuficiente como punto de acceso —la
+aplicación recibe un UUID de ticket sin conocer su \texttt{created\_at} de antemano en los
+\emph{endpoints} \texttt{GET}/\texttt{PATCH} sobre \texttt{/api/v1/tickets/\{id\}}—, se añadió el índice único secundario
+\texttt{tickets\_id\_key}, usado por \texttt{TicketRepository.findByTicketId(UUID)} para resolver
+ese acceso con un único salto índice→tabla, sin necesidad de escanear las cuatro particiones.
+
+\subsection{Colocalización con clientes y limitación arquitectónica}
+
+La guía de la Entrega 3 pide, además de la fragmentación por fecha, colocalizar \texttt{tickets}
+con \texttt{clientes} por \texttt{client\_id}, lo que en CockroachDB se implementaría típicamente
+con \texttt{INTERLEAVE IN PARENT} o una clave compartida dentro de la misma base de datos. En la
+arquitectura de microservicios heredada de la Entrega 2, los clientes son propiedad exclusiva de
+\texttt{auth-service} (\texttt{auth\_db.users}), una base de datos físicamente distinta de
+\texttt{ticket\_db} — cada microservicio es dueño de su propio esquema, sin acceso cruzado directo
+a la base de otro. Forzar una colocalización física en el sentido literal de CockroachDB
+requeriría fusionar ambas bases de datos, violando el límite de propiedad de datos entre servicios
+que es una decisión arquitectónica deliberada, no un descuido, de la Entrega 2. Se documenta esta
+tensión explícitamente en el ADR-0003 en vez de forzar una colocalización artificial: la columna
+\texttt{tickets.client\_id} permanece indexada para soportar las consultas
+\texttt{findByClientId}/\texttt{findByClientIdAndStatus}, y la resolución de identidad del cliente
+ocurre a nivel de aplicación mediante el JWT emitido por \texttt{auth-service}, no a nivel de
+almacenamiento físico compartido.
+
+\subsection{Política de replicación}
+
+Como la fragmentación pasó de ser por zona a ser por fecha, ya no existe una correspondencia 1:1
+entre una partición y la \emph{locality} de un nodo específico: una partición trimestral contiene
+tickets de las tres zonas geográficas mezclados. En consecuencia, \texttt{zones.sql}
+(Listado~\ref{lst:zones}) ya no ancla particiones a nodos por restricción de \emph{locality};
+exige uniformemente un factor de replicación 3 sobre toda la tabla, de forma que la pérdida de
+cualquier nodo individual del clúster de tres no comprometa la disponibilidad de escritura
+(2 de 3 réplicas siguen constituyendo mayoría para Raft~\cite{ongaro2014raft}).
+
+\begin{lstlisting}[language=SQL, caption={Política de replicación uniforme (\texttt{zones.sql})}, label={lst:zones}]
+ALTER TABLE tickets CONFIGURE ZONE USING num_replicas = 3;
+\end{lstlisting}
+
+\subsection{Trade-offs aceptados}
+
+El rediseño no es gratuito: las consultas filtradas por zona —el filtro más frecuente en la
+operación real de un ISP, usado por el RBAC de técnico y por la mayoría de los reportes— dejan de
+beneficiarse de poda de particiones y pasan a resolverse mediante \emph{scatter-gather} sobre las
+cuatro particiones trimestrales, mientras que antes se resolvían dentro de una sola partición. Este
+\emph{trade-off}, junto con el beneficio simétrico obtenido por las consultas de rango temporal
+(la mayoría de los reportes reales: ``tickets abiertos hoy'', ``tickets del último trimestre''), se
+mide de forma comparativa con \texttt{EXPLAIN ANALYZE} sobre las cinco consultas representativas de
+\texttt{db-cluster/scripts/queries\_bench.sql} (lectura por \texttt{id}, rango de fecha, filtro por
+zona, agregación de incumplimiento de SLA, y \emph{join} con técnicos), documentadas junto con sus
+planes de ejecución en el Anexo correspondiente del repositorio.
+
+\section{Cluster y su verificación}
+\label{sec:cluster-verificacion}
+
+\subsection{Levantamiento del clúster de tres nodos}
+
+El clúster se define en \texttt{db-cluster/docker-compose.cockroach.yml} con tres servicios
+(\texttt{roach1}, \texttt{roach2}, \texttt{roach3}) sobre la red \texttt{bridge}
+\texttt{soporte-net}, cada uno con volumen persistente propio y el comando
+\texttt{start --insecure --join=roach1,roach2,roach3} apuntando al resto de nodos —siguiendo el
+patrón estándar de arranque de un clúster CockroachDB multi-nodo. Cada nodo declara además una
+\texttt{locality} distinta (\texttt{quevedo-centro}, \texttt{quevedo-norte},
+\texttt{quevedo-sur}), simulando las tres zonas operativas del ISP para fines de política de
+replicación, y expone un \emph{healthcheck} HTTP sobre \texttt{/health?ready=1} que Docker Compose
+usa para reportar el estado del contenedor.
+
+\begin{lstlisting}[language=bash, caption={Extracto de \texttt{docker-compose.cockroach.yml}: definición de un nodo}, label={lst:compose-crdb}]
+roach1:
+  image: cockroachdb/cockroach:latest-v23.2
+  command: start --insecure --max-offset=4500ms
+    --locality=zone=quevedo-centro
+    --join=roach1,roach2,roach3
+  ports: ["26257:26257", "8083:8080"]
+  volumes: ["roach1-data:/cockroach/cockroach-data"]
+  networks: [soporte-net]
+\end{lstlisting}
+
+Tras \texttt{docker compose -f docker-compose.cockroach.yml up -d}, el clúster se inicializa una
+única vez con \texttt{cockroach init --insecure} ejecutado contra cualquiera de los tres nodos.
+La verificación de que los tres nodos forman efectivamente un único clúster operativo se realiza
+con \texttt{cockroach node status --insecure}, que debe reportar los tres identificadores de nodo
+con \texttt{is\_live=true} e \texttt{is\_available=true}; el mismo estado es visible en la consola
+web del clúster (puerto 8083 en este despliegue, reasignado desde el 8080 por defecto para no
+chocar con otro servicio local). Sobre este clúster ya verificado operativo se aplica el esquema
+fragmentado descrito en la Sección~\ref{sec:diseno-esquema} y se ejecutan las pruebas de
+integración y la instrumentación de métricas de las siguientes subsecciones.
+
+\subsection{Pruebas de integración contra CockroachDB real}
+
+Para evitar que la corrección del acceso a datos dependiera únicamente de pruebas unitarias con
+\emph{mocks} —que no pueden reproducir comportamiento específico de CockroachDB como el
+aislamiento \texttt{SERIALIZABLE} o los tipos nativos \texttt{UUID}/\texttt{STRING}—, se añadió una
+suite de pruebas de integración basada en Testcontainers
+(\texttt{TicketRepositoryIntegrationTest.java}) que levanta un contenedor real de
+\texttt{cockroachdb/cockroach:latest-v23.2} en modo \texttt{start-single-node} para cada ejecución
+de la suite, aplica el esquema real (idéntico al de \texttt{init\_db.sql}) mediante JDBC antes de
+que Spring construya el contexto de la aplicación, y lo descarta automáticamente al finalizar
+(limpieza gestionada por el \emph{sidecar} Ryuk de Testcontainers, sin intervención manual).
+
+La suite contiene dos pruebas. La primera ejerce el mismo \texttt{TicketRepository} usado en
+producción con una operación real de guardado y búsqueda por \texttt{findByTicketId(UUID)} —el
+mismo camino que ejercita el índice único secundario \texttt{tickets\_id\_key} descrito en la
+Sección~\ref{sec:diseno-esquema}—. La segunda es una prueba empírica, no simulada, de que el
+clúster aplica de verdad aislamiento \texttt{SERIALIZABLE}: dos hilos abren cada uno su propia
+conexión y transacción, ambos leen la misma fila de \texttt{tickets} (sincronizados con una
+barrera para garantizar que ambas lecturas ocurren antes de cualquier escritura) y luego ambos
+intentan actualizar el mismo campo \texttt{status}. El resultado esperado —y observado— es que al
+menos una de las dos transacciones falle al hacer \texttt{commit} con un error de conflicto de
+escritura serializable, identificado por el código de estado SQL \texttt{40001}:
+
+\begin{lstlisting}[language=Java, caption={Extracto de la prueba de conflicto serializable}, label={lst:testcontainers}]
+assertThat((Exception) conflict.get())
+    .describedAs("al menos una de las dos transacciones concurrentes "
+        + "debio fallar por conflicto serializable")
+    .isNotNull();
+assertThat(conflict.get().getSQLState()).isEqualTo("40001");
+\end{lstlisting}
+
+Esta prueba corrobora en código, de forma reproducible en cualquier máquina con Docker
+(incluyendo el entorno de integración continua), el mismo tipo de error observado en producción
+en \texttt{report-service} (\texttt{ReportEventListener.applyWithRetry}) y que
+\texttt{TicketService} está preparado para reintentar automáticamente (ver
+Sección~\ref{sec:cluster-verificacion}, métricas de reintento). Ambas pruebas se ejecutaron de
+forma exitosa contra la imagen real de CockroachDB antes de la integración de esta sección.
+
+\subsection{Instrumentación de métricas operativas}
+
+\texttt{ticket-service} expone tres métricas Prometheus, registradas mediante Micrometer y
+consumibles en el \emph{endpoint} \texttt{/actuator/prometheus}, descritas en la
+Tabla~\ref{tab:metricas}.
+
+\begin{table}[H]
+\centering
+\caption{Métricas Prometheus expuestas por \texttt{ticket-service}}
+\label{tab:metricas}
+\begin{tabular}{@{}p{4.3cm}p{1.8cm}p{6.7cm}@{}}
+\toprule
+\textbf{Métrica} & \textbf{Tipo} & \textbf{Significado} \\
+\midrule
+\texttt{crdb\_query\_duration\_seconds} & Histograma & Duración de cada consulta a \texttt{TicketRepository}, con histograma de percentiles \\
+\texttt{crdb\_transaction\_retries\_total} & Contador & Reintentos por conflicto de escritura serializable \\
+\texttt{crdb\_pool\_active\_connections} & \emph{Gauge} & Conexiones activas del \emph{pool} HikariCP hacia CockroachDB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El histograma de duración se alimenta desde un \emph{aspect} de Spring AOP
+(\texttt{RepositoryTimingAspect}) que envuelve cada llamada al repositorio sin requerir
+instrumentación manual en cada método de servicio. El contador de reintentos se incrementa
+explícitamente desde \texttt{TicketService} cada vez que una operación de guardado captura una
+\texttt{ConcurrencyFailureException} y reintenta —el mismo mecanismo ejercitado por la prueba de
+conflicto serializable de la subsección anterior—. El \emph{gauge} de conexiones activas no
+mantiene un valor cacheado: Micrometer lo reconsulta bajo demanda directamente contra el
+\texttt{HikariPoolMXBean} real del \emph{pool}, por lo que siempre refleja el estado actual del
+\emph{pool}, no una fotografía tomada en el momento del registro.
+
+Las tres métricas se validaron con el \emph{linter} oficial de Prometheus (\texttt{promtool check
+metrics}) ejecutado sobre la salida cruda del \emph{endpoint}, dentro de un contenedor
+\texttt{prom/prometheus:latest} para no requerir una instalación local de Prometheus. La
+validación no reportó advertencias ni errores sobre los tres instrumentos: los nombres siguen la
+convención de sufijo por unidad (\texttt{\_seconds}, \texttt{\_total}), y las descripciones
+(\texttt{HELP}) y tipos (\texttt{TYPE}) están correctamente declarados en la exposición.
+
+\subsection{Tolerancia a fallos del clúster}
+
+El protocolo de medición de tolerancia a fallos consiste en generar una carga de escritura
+sostenida contra el clúster de tres nodos, derribar deliberadamente un nodo
+(\texttt{docker stop roach2}) y registrar la latencia P50/P95 de las operaciones de escritura
+antes, durante y después de la caída, repitiendo después el mismo procedimiento derribando dos
+nodos simultáneamente para observar la pérdida de disponibilidad de escritura predicha por la
+teoría de consenso de la Sección~\ref{sec:fundamento-teorico} (con dos de tres nodos caídos ya no
+existe mayoría para confirmar escrituras vía Raft).
+
+Durante la preparación de este protocolo se recreó, de forma no planificada pero informativa, el
+escenario adyacente de saturación de memoria: una carga inicial de 150{,}000 filas en una sola
+transacción provocó que el nodo \texttt{roach1} fuera terminado por el sistema operativo por falta
+de memoria (código de salida 137) bajo el límite original de 512\,MB por contenedor, y el propio
+reinicio del nodo —una operación intensiva en memoria en CockroachDB, que debe reconstruir su
+estado desde el registro de Raft— volvió a fallar por el mismo motivo antes de estabilizarse. El
+límite de memoria de los tres nodos se incrementó a 1024\,MB en
+\texttt{docker-compose.cockroach.yml} como mitigación documentada, y la recarga completa del
+conjunto de datos de 150{,}000 filas se replanificó en lotes más pequeños para el protocolo formal
+de tolerancia a fallos. Este incidente, aunque no forma parte del protocolo experimental
+diseñado, es evidencia operativa consistente con la teoría: un nodo bajo presión de recursos deja
+de poder participar en el consenso, degradando la disponibilidad del clúster de la misma forma
+que una caída deliberada, y su recuperación no es instantánea.
+
+\textbf{Estado de este resultado en el corte de este documento:} la ejecución formal del protocolo
+de tolerancia a fallos (carga sostenida, derribo de uno y luego dos nodos, medición de latencia
+P50/P95, y grabación en video del comportamiento observado) está planificada como el último paso
+de esta entrega, por requerir una sesión de captura dedicada con el equipo completo. Los números
+de latencia bajo caída de nodos se reportarán en la versión final de este documento una vez
+ejecutado el protocolo; se documenta aquí explícitamente como pendiente de ejecución, en vez de
+sustituirse por valores estimados o de otra fuente.
+
+\section{Pipeline analítico paralelo}
+\label{sec:pipeline-paralelo}
+
+\subsection{Objetivo analítico y dataset}
+
+El pipeline se orienta al objetivo analítico específico asignado al equipo ACC en la guía de la
+Entrega 3: reincidencia de clientes y agrupamiento (\emph{clustering}) de incidencias. El dataset
+sintético se genera con \texttt{spark/src/generate\_dataset.py} sobre 600{,}000 incidencias de
+red, particionado en Parquet por zona geográfica, con dos características deliberadas necesarias
+para que el análisis tenga señal real: el identificador de cliente (\texttt{client\_id}) se genera
+con una distribución de Pareto en vez de uniforme —la mayoría de los clientes aparece una sola vez
+y una minoría concentra muchas incidencias, reproduciendo el patrón real de reincidencia de un
+ISP—, y cada incidencia incluye una descripción de texto libre corta generada por plantilla,
+necesaria para la etapa de \emph{clustering} basada en texto. El carácter sintético del dataset y
+la justificación de ambas decisiones de generación están documentados en el propio script y se
+declaran también en \texttt{ai-usage-declaration.md}.
+
+\subsection{Las cinco transformaciones}
+
+\texttt{spark/src/transformations.py} implementa las cinco categorías de transformación exigidas
+por la guía (Módulo E, Sección 5.6), aplicadas de forma no genérica al objetivo analítico del
+equipo:
+
+\begin{enumerate}[leftmargin=1.5em]
+    \item \textbf{Filtrado (T1, sin \emph{shuffle})}: retiene únicamente incidencias resueltas y
+        con los campos que el resto del pipeline necesita (\texttt{client\_id},
+        \texttt{description} no nulos) — base válida tanto para el análisis de reincidencia como
+        para el \emph{clustering}.
+    \item \textbf{\emph{Join} colocalizado (T2, con \emph{shuffle})}: incidencias \emph{join}
+        clientes por \texttt{client\_id}, instanciando la exigencia de colocalización de la
+        Tabla 1 de la guía para el equipo ACC.
+    \item \textbf{Función de ventana (T3, con \emph{shuffle})}: para cada cliente,
+        \texttt{Window.partitionBy("client\_id")} \texttt{.orderBy("timestamp")} calcula el número de
+        orden de cada incidencia (\texttt{incident\_seq}) y el \emph{timestamp} de la incidencia
+        anterior del mismo cliente (\texttt{previous\_timestamp}) mediante \texttt{F.lag}.
+    \item \textbf{Transformación de tipos temporales (T4, sin \emph{shuffle})}: a partir de
+        \texttt{previous\_timestamp}, deriva la fecha de la incidencia, los días transcurridos
+        desde la incidencia previa del cliente, y una bandera \texttt{is\_recurring\_30d} que
+        marca reincidencia dentro de una ventana de 30 días — la métrica de reincidencia exigida
+        para el equipo.
+    \item \textbf{Aprendizaje automático (T5)}: agrupamiento de incidencias por texto y zona.
+        La descripción libre se vectoriza con TF-IDF
+        (\texttt{Tokenizer} + \texttt{StopWordsRemover} en español + \texttt{HashingTF} + \texttt{IDF}),
+        la zona se codifica con \texttt{StringIndexer} (satisfaciendo también el ejemplo explícito
+        de la guía), ambas \emph{features} se combinan con \texttt{VectorAssembler}, y se agrupan
+        con \texttt{KMeans} ($k=5$, semilla fija 42 para reproducibilidad).
+\end{enumerate}
+
+\subsection{Ejecución y resultados observados}
+
+El pipeline se ejecutó de extremo a extremo sobre el dataset completo de 600{,}000 filas mediante
+un \emph{notebook} de Jupyter (\texttt{spark/notebooks/spark\_pipeline.ipynb}), exportado con
+salidas reales vía \texttt{nbconvert --execute} para satisfacer el requisito de reproducibilidad —
+no se trata de celdas de código estático sin ejecutar. La Tabla~\ref{tab:pipeline-resultados}
+resume las cifras observadas en esa ejecución.
+
+\begin{table}[H]
+\centering
+\caption{Resultados observados de la ejecución del pipeline sobre 600{,}000 filas}
+\label{tab:pipeline-resultados}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Magnitud} & \textbf{Valor} \\
+\midrule
+Filas totales del dataset & 600{,}000 \\
+Filas tras T1 (filtrado, resueltas y completas) & 557{,}701 \\
+Incidencias marcadas como reincidentes en 30 días (T4) & 380{,}753 (68.3\% de las filtradas) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La alta proporción de reincidencia observada (68.3\%) es consistente con el diseño deliberado del
+generador de datos: al concentrar una fracción significativa de las incidencias en un subconjunto
+pequeño de clientes (distribución de Pareto), es esperable que buena parte de esas incidencias
+caigan dentro de la ventana de 30 días de una incidencia previa del mismo cliente. La
+Tabla~\ref{tab:clustering-resultados} muestra la distribución de tamaños de los cinco grupos
+producidos por \texttt{KMeans} en T5.
+
+\begin{table}[H]
+\centering
+\caption{Tamaño de los cinco grupos producidos por T5 (\emph{clustering})}
+\label{tab:clustering-resultados}
+\begin{tabular}{@{}rr@{}}
+\toprule
+\textbf{Grupo (\texttt{cluster})} & \textbf{Incidencias} \\
+\midrule
+0 & 13{,}761 \\
+1 & 453{,}625 \\
+2 & 27{,}815 \\
+3 & 13{,}968 \\
+4 & 48{,}532 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La distribución de tamaños es marcadamente no uniforme, con un grupo dominante (cluster 1,
+81.3\% de las filas filtradas) y cuatro grupos considerablemente más pequeños. Esto es coherente
+con la naturaleza del \emph{feature} de texto: al usarse plantillas de descripción cortas y
+relativamente similares entre sí para la mayoría de los tipos de incidencia comunes, es esperable
+que el vector TF-IDF resultante concentre a la mayoría de las incidencias en una región densa del
+espacio de \emph{features}, mientras que descripciones más específicas o zonas menos representadas
+se separan en grupos más pequeños y homogéneos — un resultado no degenerado (no todos los puntos
+en un único grupo, ni una partición trivialmente uniforme en cinco quintos iguales), suficiente
+para ilustrar la mecánica de \emph{clustering} sobre datos reales del pipeline sin necesitar
+afinar hiperparámetros adicionales fuera del alcance de esta entrega.
+
+\subsection{Baseline secuencial}
+
+Como contraparte de comparación para el protocolo experimental de la
+Sección~\ref{sec:protocolo-resultados}, \texttt{spark/src/baseline.py} implementa las mismas cinco
+transformaciones con pandas y scikit-learn puro, en un único proceso, sobre el mismo dataset. Este
+baseline es el punto de referencia necesario para poder afirmar que el \emph{speedup} observado en
+el pipeline de Spark proviene de paralelismo real y no únicamente del \emph{overhead} de
+coordinación distribuida evitado por no usar Spark en absoluto para datasets de este tamaño.
+
+\section{Protocolo y resultados}
+\label{sec:protocolo-resultados}
+
+\subsection{Hipótesis y variables}
+
+Siguiendo las recomendaciones de Jain~\cite{jain1991art} y Wohlin et al.~\cite{wohlin2012experimentation}
+para el diseño de experimentos de rendimiento en sistemas de software, se formulan las siguientes
+hipótesis:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{H1}: el pipeline paralelo con $N$ núcleos presenta menor tiempo medio de
+        ejecución que el baseline secuencial (pandas) para $|D| \geq 5 \times 10^5$ registros.
+    \item \textbf{H0}: no hay diferencia significativa entre el pipeline paralelo y el baseline
+        secuencial.
+\end{itemize}
+
+La Tabla~\ref{tab:variables-experimento} resume las variables del diseño.
+
+\begin{table}[H]
+\centering
+\caption{Variables del protocolo experimental}
+\label{tab:variables-experimento}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Tipo} & \textbf{Variable} & \textbf{Valores} \\
+\midrule
+Independiente & Número de núcleos/particiones $N$ & $\{1, 2, 4, 8\}$ \\
+Independiente & Modo de ejecución & Spark (\texttt{local[N]}) vs.\ baseline secuencial \\
+Dependiente & Tiempo total de ejecución $t$ & segundos \\
+Dependiente & Tiempo por transformación $t_i$ & segundos (T1--T5) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El dataset usado es el descrito en la Sección~\ref{sec:pipeline-paralelo}, generado con semilla
+fija (\texttt{seed=42}, determinista) y 600{,}000 filas, por encima del umbral de $5 \times 10^5$
+exigido por H1.
+
+\subsection{Diseño experimental}
+
+Se emplea un diseño de bloque completo con $r=10$ repeticiones por nivel de $N$ y por el baseline
+secuencial (cinco niveles en total: baseline, $N=1$, $N=2$, $N=4$, $N=8$; 50 corridas en total).
+Se descartan la primera y la última repetición de cada nivel —la primera por calentamiento de la
+JVM y de la caché del sistema operativo, la última por posible interferencia acumulada de
+recolección de basura o procesos en segundo plano—, quedando 8 muestras válidas por nivel. El
+diseño está implementado en \texttt{spark/src/protocol\_experiment.py}, reutilizando las mismas
+funciones de transformación (\texttt{transformations.py}) y de baseline (\texttt{baseline.py})
+descritas en la Sección~\ref{sec:pipeline-paralelo}, de modo que la comparación mide exclusivamente
+el efecto del paralelismo y no diferencias de implementación entre ambos caminos de código.
+
+\subsection{Plan de análisis estadístico}
+
+Para cada nivel se calcula la media $\bar{t}$, la desviación típica $s$, y el intervalo de
+confianza al 95\% ($\bar{t} \pm 1.96 \cdot s/\sqrt{r}$, con $r=8$ tras el recorte). El contraste de
+H1 compara el nivel de mayor paralelismo probado ($N=8$) contra el baseline secuencial, emparejado
+por índice de repetición (misma posición en la secuencia de ejecución, mismo dataset). Se prueba
+primero la normalidad de las diferencias emparejadas con Shapiro--Wilk ($\alpha=0.05$): si no se
+rechaza la normalidad se aplica la prueba \emph{t} pareada (\texttt{scipy.stats.ttest\_rel}); si se
+rechaza, se aplica la prueba de rangos con signo de Wilcoxon
+(\texttt{scipy.stats.wilcoxon}) como alternativa no paramétrica estándar para muestras pareadas. Se
+rechaza H0 a favor de H1 si el $p$-valor de la prueba elegida es menor a 0.05 \emph{y} la
+diferencia media (secuencial $-$ paralelo) es positiva.
+
+\subsection{Amenazas a la validez}
+
+\textbf{Internas:}
+\begin{enumerate}[leftmargin=1.5em]
+    \item \emph{Calentamiento de la JVM}: la primera ejecución de cada nivel de Spark paga el
+        costo de inicialización de clases y compilación \emph{just-in-time}, no solo el trabajo
+        real — mitigado descartando la primera repetición de cada nivel.
+    \item \emph{Ruido del sistema anfitrión}: el experimento corre en un contenedor Docker sobre
+        Windows, compartiendo CPU con el resto de servicios del sistema (CockroachDB, Kafka) si
+        están activos simultáneamente; se recomienda correr el protocolo con el resto de servicios
+        detenidos para minimizar interferencia.
+    \item \emph{Caché del sistema operativo}: lecturas repetidas del mismo archivo Parquet se
+        benefician de la caché de páginas tras la primera lectura, afectando de forma no uniforme
+        a las primeras repeticiones de cada nivel.
+\end{enumerate}
+
+\textbf{Externas:}
+\begin{enumerate}[leftmargin=1.5em]
+    \item \emph{Representatividad del dataset}: es sintético; los tiempos relativos entre
+        transformaciones podrían diferir frente a datos reales de un ISP con otra distribución de
+        texto o cardinalidad de clientes.
+    \item \emph{Generalidad a otras cargas}: el pipeline concreto (filtrado, \emph{join}, ventana,
+        tipos temporales, \emph{clustering}) no representa necesariamente el comportamiento de
+        cargas de Spark dominadas por \emph{shuffles} masivos entre tablas de gran tamaño mutuo,
+        en vez de una tabla grande contra una dimensión pequeña.
+\end{enumerate}
+
+\subsection{Ajuste de la ley de Amdahl}
+
+Con las mediciones de tiempo total por nivel de $N$ se ajusta la fracción paralelizable $p$ de la
+Ecuación~\ref{eq:amdahl} por mínimos cuadrados sobre los cuatro niveles de Spark ($N=1,2,4,8$),
+obteniendo también el límite asintótico $S(\infty) = 1/(1-p)$ y el número de núcleos necesario
+para alcanzar el 90\% de ese límite. Este ajuste se produce automáticamente al ejecutar el
+protocolo (\texttt{amdahl\_fit.json}) y se reporta en la Tabla~\ref{tab:amdahl-fit} una vez
+disponible la ejecución completa.
+
+\subsection{Resultados}
+
+\textbf{Estado de este resultado en el corte de este documento:} la ejecución completa del
+protocolo (50 corridas: 10 repeticiones $\times$ 5 niveles) tiene una duración estimada de 75 a 90
+minutos sobre el conjunto de 600{,}000 filas, y se ejecuta como paso final de esta entrega, en una
+ventana de tiempo dedicada para no interferir con el resto de servicios del sistema (amenaza a la
+validez interna documentada arriba). Los artefactos de salida —\texttt{raw.csv} con las 50
+repeticiones crudas, \texttt{summary\_stats.csv} con media/desviación/IC95\% por nivel,
+\texttt{stats\_test.json} con el estadístico y $p$-valor de la prueba elegida, y
+\texttt{boxplot.png}— se generan en \texttt{spark/results/protocol/} al correr
+\texttt{protocol\_experiment.py} y se copian a \texttt{docs/experimentos/resultados/} para su
+inclusión en la versión final de este documento. Se documenta este resultado como pendiente de
+ejecución en vez de sustituirlo por valores estimados, siguiendo el mismo criterio de honestidad
+aplicado a la Sección~\ref{sec:cluster-verificacion} para los resultados de tolerancia a fallos.
+
+\begin{table}[H]
+\centering
+\caption{Plantilla de resultados por nivel (a completar tras la ejecución del protocolo)}
+\label{tab:amdahl-fit}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Nivel} & $\bar{t}$ (s) & IC95\% & \textbf{Speedup vs.\ baseline} \\
+\midrule
+Baseline (pandas) & --- & --- & 1.00$\times$ (referencia) \\
+Spark $N=1$ & --- & --- & --- \\
+Spark $N=2$ & --- & --- & --- \\
+Spark $N=4$ & --- & --- & --- \\
+Spark $N=8$ & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discusión}
+\label{sec:discusion}
+
+\subsection{Sobre la fragmentación por fecha frente al patrón de acceso real}
+
+El rediseño de la fragmentación descrito en la Sección~\ref{sec:diseno-esquema} ilustra una tensión
+frecuente en el diseño de sistemas distribuidos: la clave de fragmentación que exige el requisito
+formal de la asignatura (\texttt{fecha\_apertura}) no coincide con el filtro más frecuente del
+dominio real del problema (\texttt{zone}, usado por el control de acceso por rol de técnico y por
+la mayoría de los reportes operativos). Se priorizó el cumplimiento literal del requisito sobre la
+preferencia de diseño original, documentando explícitamente en el ADR-0003 el costo aceptado
+—consultas por zona convertidas en \emph{scatter-gather} sobre las cuatro particiones— en vez de
+ocultarlo o de forzar un diseño híbrido no solicitado. En un sistema de producción real, esta
+decisión probablemente se resolvería con una fragmentación compuesta (por ejemplo, subparticiones
+por zona dentro de cada partición temporal) o con un índice secundario global cubriente sobre
+\texttt{zone}; ambas alternativas quedan fuera del alcance de esta entrega pero se identifican como
+extensión natural del diseño actual.
+
+\subsection{Sobre la colocalización cliente–ticket entre microservicios}
+
+La limitación más significativa frente a la letra de la guía es la imposibilidad de colocalizar
+físicamente \texttt{tickets} con la tabla de clientes, porque esta última es propiedad de
+\texttt{auth-service} en una base de datos distinta. Esta tensión —requisito de la guía de
+Entrega 3 (pensada para un esquema monolítico o de bases de datos compartidas) contra un principio
+central de la arquitectura de microservicios adoptada desde la Entrega 2 (cada servicio es dueño
+exclusivo de su propio esquema)— se resolvió documentando la limitación en vez de comprometer el
+límite de propiedad de datos entre servicios, que es una de las garantías arquitectónicas más
+valiosas de la descomposición en microservicios~\cite{newman2021microservices}: permite evolucionar
+o escalar \texttt{ticket-service} sin coordinar cambios de esquema con \texttt{auth-service}. La
+alternativa de aplicación —resolución de identidad del cliente vía JWT en vez de una clave física
+compartida— preserva esta garantía a costa de no poder ejecutar un \emph{join} físico dentro del
+motor de base de datos entre ambas tablas.
+
+\subsection{Sobre la instrumentación y la observabilidad}
+
+La combinación de pruebas de integración con Testcontainers y métricas Prometheus verificadas con
+\texttt{promtool} (Sección~\ref{sec:cluster-verificacion}) resultó más valiosa de lo previsto
+inicialmente para diagnosticar el propio incidente de saturación de memoria descrito en esa
+sección: sin las métricas de reintentos y sin comprender el comportamiento esperado del aislamiento
+serializable —verificado previamente en las pruebas de integración—, habría sido más difícil
+distinguir un problema de recursos del sistema operativo (memoria insuficiente) de un problema de
+diseño en la capa de datos. Esto refuerza un principio general de sistemas distribuidos: la
+observabilidad no es solo un requisito de cumplimiento de la rúbrica, sino una herramienta de
+diagnóstico que se vuelve indispensable precisamente cuando el sistema falla de forma inesperada.
+
+\subsection{Sobre la representatividad del pipeline analítico}
+
+El pipeline de Spark descrito en la Sección~\ref{sec:pipeline-paralelo} se diseñó deliberadamente
+para reflejar un caso de uso analítico propio del dominio (reincidencia y \emph{clustering} de
+incidencias) en vez de aplicar las cinco transformaciones exigidas de forma genérica sobre datos
+sin relación con el negocio. Esto tiene un costo: los resultados de \emph{speedup} del protocolo
+experimental (Sección~\ref{sec:protocolo-resultados}) son específicos a un pipeline dominado por
+una etapa de \emph{join}/ventana con \emph{shuffle} moderado y una etapa final de aprendizaje
+automático relativamente costosa (vectorización TF-IDF + \texttt{KMeans}), y no necesariamente
+generalizan a pipelines de Spark dominados por \emph{shuffles} masivos entre tablas de tamaño
+comparable. Se documenta esta amenaza a la validez externa explícitamente en la
+Sección~\ref{sec:protocolo-resultados} en vez de presentar la conclusión del experimento como
+universalmente aplicable a cualquier carga de trabajo de Spark.
+
+\subsection{Alcance no cubierto en esta entrega}
+
+Dos elementos mencionados en la guía de la asignatura —un \emph{API Gateway} explícito como punto
+de entrada único al conjunto de microservicios, y la orquestación completa de los cinco
+microservicios mediante un único archivo \texttt{docker-compose.yml} raíz— no se implementaron en
+esta entrega y quedan identificados como extensión pendiente: actualmente cada microservicio se
+levanta y orquesta de forma independiente, sin una capa de enrutamiento y políticas transversales
+(limitación de tasa, agregación de respuestas) centralizada.
+
+\section{Conclusiones e integración con E4}
+\label{sec:conclusiones}
+
+Este trabajo abordó dos dimensiones de la Entrega 3 sobre la base de código de microservicios
+construida en entregas anteriores: la fragmentación horizontal correcta y verificable de la capa
+de datos, y el procesamiento analítico paralelo de un volumen de datos que excede lo razonable
+para un solo proceso. Sobre la primera dimensión, se rediseñó la tabla \texttt{tickets} de un
+esquema fragmentado por zona geográfica a uno fragmentado por rango de \texttt{fecha\_apertura},
+verificando formalmente las tres condiciones de corrección de toda fragmentación horizontal
+—completitud, reconstrucción y disyunción— y documentando explícitamente, en vez de ocultar, los
+\emph{trade-offs} aceptados: degradación de las consultas por zona a \emph{scatter-gather} sobre
+cuatro particiones, y la imposibilidad de colocalización física con la tabla de clientes por
+pertenecer a un microservicio distinto. La corrección del comportamiento transaccional del clúster
+—en particular, el rechazo explícito de escrituras concurrentes conflictivas propio del aislamiento
+\texttt{SERIALIZABLE}— se verificó empíricamente contra una instancia real de CockroachDB mediante
+Testcontainers, no mediante inspección manual ni simulación, y se instrumentó con métricas
+Prometheus validadas sin advertencias por el \emph{linter} oficial de la herramienta.
+
+Sobre la segunda dimensión, se implementó un pipeline de Apache Spark con las cinco categorías de
+transformación exigidas, aplicadas de forma coherente a un objetivo analítico propio del dominio
+—reincidencia de clientes y agrupamiento de incidencias por texto y zona— y ejecutado de extremo a
+extremo sobre un conjunto sintético de 600{,}000 registros con resultados reproducibles y no
+triviales: 68.3\% de reincidencia detectada dentro de una ventana de 30 días y una distribución de
+\emph{clusters} no degenerada. Se diseñó, siguiendo metodología estándar de experimentación en
+ingeniería de software, un protocolo formal para contrastar el rendimiento de este pipeline contra
+un baseline secuencial equivalente y para caracterizar su ajuste a la ley de Amdahl.
+
+Los dos resultados numéricos que dependen de ejecuciones prolongadas y de coordinación logística
+del equipo —la caracterización de tolerancia a fallos ante caída de uno y dos nodos, y la ejecución
+completa del protocolo experimental de 50 corridas— se documentan en este trabajo con su diseño,
+implementación y estado de ejecución completos, pero sus valores numéricos finales se reportan como
+pendientes de la ejecución programada para el cierre de esta entrega, en línea con el compromiso de
+no sustituir mediciones reales por estimaciones a lo largo de todo el documento.
+
+\subsection{Integración con la Entrega 4}
+
+Siguiendo el principio de complementariedad E3→E4 de la guía de esta entrega —todo artefacto
+producido en E3 debe reutilizarse, ampliarse o instrumentarse en E4, no descartarse—, los
+siguientes artefactos quedan disponibles para consumo directo en el siguiente ciclo:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{El esquema de base de datos fragmentado} (\texttt{db-cluster/scripts/init\_db.sql},
+        ADR-0003) y el propio \textbf{clúster de tres nodos de CockroachDB} quedan como la capa de
+        persistencia definitiva del sistema: E4 no necesita rediseñar ni migrar datos, solo construir
+        sobre ella la interfaz web, la interfaz móvil y la observabilidad exigidas en el siguiente
+        ciclo.
+    \item \textbf{Las tres métricas Prometheus} instrumentadas en la
+        Sección~\ref{sec:cluster-verificacion} (\texttt{crdb\_query\_duration\_seconds},
+        \texttt{crdb\_transaction\_retries\_total}, \texttt{crdb\_pool\_active\_connections}) se
+        emplean tal cual, sin modificación, como fuente de datos del panel de observabilidad
+        consolidado que exige E4 —por eso se instrumentaron en esta entrega y no se aplazaron.
+    \item \textbf{Las pruebas de integración con Testcontainers} quedan incorporadas a la suite de
+        pruebas del proyecto como regresión permanente: cualquier cambio futuro sobre
+        \texttt{ticket-service} en E4 se sigue verificando contra una instancia real de CockroachDB,
+        no contra una base embebida.
+    \item \textbf{El pipeline de Spark y el protocolo experimental} (\texttt{spark/src/pipeline.py},
+        \texttt{baseline.py}, \texttt{protocol\_experiment.py}) quedan como la base analítica
+        reutilizable: E4 puede extenderlos con nuevas transformaciones o exponer sus resultados
+        (reincidencia, \emph{clusters} de incidencias) a través de la interfaz de usuario, sin
+        rehacer la integración JDBC ni el diseño experimental ya validado aquí.
+\end{itemize}
+
+Como trabajo futuro más allá de lo directamente heredable por E4, se identifican dos líneas
+adicionales: una estrategia de fragmentación compuesta que preserve el beneficio de poda de
+particiones tanto para consultas temporales como para consultas por zona, y la validación del
+pipeline analítico sobre un conjunto de datos real de incidencias de un ISP, para contrastar la
+representatividad del dataset sintético usado en esta entrega frente a la distribución real de
+texto y de cardinalidad de clientes del dominio.
+
+
+\bibliographystyle{ieeetr}
+\bibliography{referencias}
+
+\end{document}

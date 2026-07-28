@@ -1,0 +1,188 @@
+\section{Cluster y su verificación}
+\label{sec:cluster-verificacion}
+
+\subsection{Levantamiento del clúster de tres nodos}
+
+El clúster se define en \texttt{db-cluster/docker-compose.cockroach.yml} con tres servicios
+(\texttt{roach1}, \texttt{roach2}, \texttt{roach3}) sobre la red \texttt{bridge}
+\texttt{soporte-net}, cada uno con volumen persistente propio y el comando
+\texttt{start --insecure --join=roach1,roach2,roach3} apuntando al resto de nodos —siguiendo el
+patrón estándar de arranque de un clúster CockroachDB multi-nodo. Cada nodo declara además una
+\texttt{locality} distinta (\texttt{quevedo-centro}, \texttt{quevedo-norte},
+\texttt{quevedo-sur}), simulando las tres zonas operativas del ISP para fines de política de
+replicación, y expone un \emph{healthcheck} HTTP sobre \texttt{/health?ready=1} que Docker Compose
+usa para reportar el estado del contenedor.
+
+\begin{lstlisting}[language=bash, caption={Extracto de \texttt{docker-compose.cockroach.yml}: definición de un nodo}, label={lst:compose-crdb}]
+roach1:
+  image: cockroachdb/cockroach:latest-v23.2
+  command: start --insecure --max-offset=4500ms
+    --locality=zone=quevedo-centro
+    --join=roach1,roach2,roach3
+  ports: ["26257:26257", "8083:8080"]
+  volumes: ["roach1-data:/cockroach/cockroach-data"]
+  networks: [soporte-net]
+\end{lstlisting}
+
+Tras \texttt{docker compose -f docker-compose.cockroach.yml up -d}, el clúster se inicializa una
+única vez con \texttt{cockroach init --insecure} ejecutado contra cualquiera de los tres nodos.
+La verificación de que los tres nodos forman efectivamente un único clúster operativo se realiza
+con \texttt{cockroach node status --insecure}, que debe reportar los tres identificadores de nodo
+con \texttt{is\_live=true} e \texttt{is\_available=true}; el mismo estado es visible en la consola
+web del clúster (puerto 8083 en este despliegue, reasignado desde el 8080 por defecto para no
+chocar con otro servicio local). Sobre este clúster ya verificado operativo se aplica el esquema
+fragmentado descrito en la Sección~\ref{sec:diseno-esquema} y se ejecutan las pruebas de
+integración y la instrumentación de métricas de las siguientes subsecciones.
+
+\subsection{Pruebas de integración contra CockroachDB real}
+
+Para evitar que la corrección del acceso a datos dependiera únicamente de pruebas unitarias con
+\emph{mocks} —que no pueden reproducir comportamiento específico de CockroachDB como el
+aislamiento \texttt{SERIALIZABLE} o los tipos nativos \texttt{UUID}/\texttt{STRING}—, se añadió una
+suite de pruebas de integración basada en Testcontainers
+(\texttt{TicketRepositoryIntegrationTest.java}) que levanta un contenedor real de
+\texttt{cockroachdb/cockroach:latest-v23.2} en modo \texttt{start-single-node} para cada ejecución
+de la suite, aplica el esquema real (idéntico al de \texttt{init\_db.sql}) mediante JDBC antes de
+que Spring construya el contexto de la aplicación, y lo descarta automáticamente al finalizar
+(limpieza gestionada por el \emph{sidecar} Ryuk de Testcontainers, sin intervención manual).
+
+La suite contiene dos pruebas. La primera ejerce el mismo \texttt{TicketRepository} usado en
+producción con una operación real de guardado y búsqueda por \texttt{findByTicketId(UUID)} —el
+mismo camino que ejercita el índice único secundario \texttt{tickets\_id\_key} descrito en la
+Sección~\ref{sec:diseno-esquema}—. La segunda es una prueba empírica, no simulada, de que el
+clúster aplica de verdad aislamiento \texttt{SERIALIZABLE}: dos hilos abren cada uno su propia
+conexión y transacción, ambos leen la misma fila de \texttt{tickets} (sincronizados con una
+barrera para garantizar que ambas lecturas ocurren antes de cualquier escritura) y luego ambos
+intentan actualizar el mismo campo \texttt{status}. El resultado esperado —y observado— es que al
+menos una de las dos transacciones falle al hacer \texttt{commit} con un error de conflicto de
+escritura serializable, identificado por el código de estado SQL \texttt{40001}:
+
+\begin{lstlisting}[language=Java, caption={Extracto de la prueba de conflicto serializable}, label={lst:testcontainers}]
+assertThat((Exception) conflict.get())
+    .describedAs("al menos una de las dos transacciones concurrentes "
+        + "debio fallar por conflicto serializable")
+    .isNotNull();
+assertThat(conflict.get().getSQLState()).isEqualTo("40001");
+\end{lstlisting}
+
+Esta prueba corrobora en código, de forma reproducible en cualquier máquina con Docker
+(incluyendo el entorno de integración continua), el mismo tipo de error observado en producción
+en \texttt{report-service} (\texttt{ReportEventListener.applyWithRetry}) y que
+\texttt{TicketService} está preparado para reintentar automáticamente (ver
+Sección~\ref{sec:cluster-verificacion}, métricas de reintento). Ambas pruebas se ejecutaron de
+forma exitosa contra la imagen real de CockroachDB antes de la integración de esta sección.
+
+\subsection{Instrumentación de métricas operativas}
+
+\texttt{ticket-service} expone tres métricas Prometheus, registradas mediante Micrometer y
+consumibles en el \emph{endpoint} \texttt{/actuator/prometheus}, descritas en la
+Tabla~\ref{tab:metricas}.
+
+\begin{table}[H]
+\centering
+\caption{Métricas Prometheus expuestas por \texttt{ticket-service}}
+\label{tab:metricas}
+\begin{tabular}{@{}p{4.3cm}p{1.8cm}p{6.7cm}@{}}
+\toprule
+\textbf{Métrica} & \textbf{Tipo} & \textbf{Significado} \\
+\midrule
+\texttt{crdb\_query\_duration\_seconds} & Histograma & Duración de cada consulta a \texttt{TicketRepository}, con histograma de percentiles \\
+\texttt{crdb\_transaction\_retries\_total} & Contador & Reintentos por conflicto de escritura serializable \\
+\texttt{crdb\_pool\_active\_connections} & \emph{Gauge} & Conexiones activas del \emph{pool} HikariCP hacia CockroachDB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El histograma de duración se alimenta desde un \emph{aspect} de Spring AOP
+(\texttt{RepositoryTimingAspect}) que envuelve cada llamada al repositorio sin requerir
+instrumentación manual en cada método de servicio. El contador de reintentos se incrementa
+explícitamente desde \texttt{TicketService} cada vez que una operación de guardado captura una
+\texttt{ConcurrencyFailureException} y reintenta —el mismo mecanismo ejercitado por la prueba de
+conflicto serializable de la subsección anterior—. El \emph{gauge} de conexiones activas no
+mantiene un valor cacheado: Micrometer lo reconsulta bajo demanda directamente contra el
+\texttt{HikariPoolMXBean} real del \emph{pool}, por lo que siempre refleja el estado actual del
+\emph{pool}, no una fotografía tomada en el momento del registro.
+
+Las tres métricas se validaron con el \emph{linter} oficial de Prometheus (\texttt{promtool check
+metrics}) ejecutado sobre la salida cruda del \emph{endpoint}, dentro de un contenedor
+\texttt{prom/prometheus:latest} para no requerir una instalación local de Prometheus. La
+validación no reportó advertencias ni errores sobre los tres instrumentos: los nombres siguen la
+convención de sufijo por unidad (\texttt{\_seconds}, \texttt{\_total}), y las descripciones
+(\texttt{HELP}) y tipos (\texttt{TYPE}) están correctamente declarados en la exposición.
+
+\subsection{Tolerancia a fallos del clúster}
+
+El protocolo de medición de tolerancia a fallos consiste en generar una carga de escritura
+sostenida contra el clúster de tres nodos, derribar deliberadamente un nodo
+(\texttt{docker stop roach2}) y registrar la latencia P50/P95 de las operaciones de escritura
+antes, durante y después de la caída, repitiendo después el mismo procedimiento derribando dos
+nodos simultáneamente para observar la pérdida de disponibilidad de escritura predicha por la
+teoría de consenso de la Sección~\ref{sec:fundamento-teorico} (con dos de tres nodos caídos ya no
+existe mayoría para confirmar escrituras vía Raft).
+
+Durante la preparación de este protocolo se recreó, de forma no planificada pero informativa, el
+escenario adyacente de saturación de memoria: una carga inicial de 150{,}000 filas en una sola
+transacción provocó que el nodo \texttt{roach1} fuera terminado por el sistema operativo por falta
+de memoria (código de salida 137) bajo el límite original de 512\,MB por contenedor, y el propio
+reinicio del nodo —una operación intensiva en memoria en CockroachDB, que debe reconstruir su
+estado desde el registro de Raft— volvió a fallar por el mismo motivo antes de estabilizarse. El
+límite de memoria de los tres nodos se incrementó a 1024\,MB en
+\texttt{docker-compose.cockroach.yml} como mitigación documentada, y la recarga completa del
+conjunto de datos de 150{,}000 filas se replanificó en lotes más pequeños para el protocolo formal
+de tolerancia a fallos. Este incidente, aunque no forma parte del protocolo experimental
+diseñado, es evidencia operativa consistente con la teoría: un nodo bajo presión de recursos deja
+de poder participar en el consenso, degradando la disponibilidad del clúster de la misma forma
+que una caída deliberada, y su recuperación no es instantánea.
+
+\subsubsection{Resultados}
+
+El protocolo se ejecutó con una carga inicial de 101{,}996 filas en \texttt{tickets}. La
+Tabla~\ref{tab:tolerancia-1nodo} resume la carga sostenida (\texttt{load\_write.py},
+100 filas/s) durante la caída de \texttt{roach2}.
+
+\begin{table}[H]
+\centering
+\caption{Latencia por ventana de 10s durante la caída de 1 nodo (roach2)}
+\label{tab:tolerancia-1nodo}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Ventana} & \textbf{P50} & \textbf{P95} & \textbf{Errores} & \textbf{Filas} \\
+\midrule
+1 & 38.6 ms & 118.4 ms & 0 & 110 \\
+2 (\texttt{docker kill roach2}) & 69.3 ms & \textbf{1590.8 ms} & 0 & 44 \\
+3 & 31.0 ms & 107.9 ms & 0 & 130 \\
+4 & 40.2 ms & 95.7 ms & 0 & 114 \\
+5 & 26.3 ms & 69.3 ms & 0 & 163 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El pico de $P95=1590.8$\,ms en la ventana 2 coincide con el instante de \texttt{docker kill
+roach2}: el tiempo que Raft necesita para reelegir líder en los rangos cuyo \emph{leaseholder} era
+roach2. Ningún dato se pierde ni falla (0 errores en las 691 filas insertadas); el único efecto
+observable es latencia transitoria, no indisponibilidad — el clúster tolera la caída de un nodo
+sin degradar la disponibilidad de escritura, como predice el quórum de mayoría 2 de 3.
+
+Al repetir la prueba derribando también \texttt{roach3} (solo \texttt{roach1} en pie), la carga
+sostenida (50 filas/s) muestra una brecha de \textbf{62 segundos} entre dos ventanas consecutivas
+que normalmente distan 10-12\,s, coincidiendo exactamente con la ventana de tiempo en la que
+ambos nodos permanecieron caídos: sin mayoría posible, la conexión abierta quedó bloqueada
+esperando confirmación en vez de recibir un error inmediato, y una consulta
+\texttt{SELECT count(*)} lanzada en ese mismo intervalo no devolvió resultado hasta reincorporar
+\texttt{roach2}. Esta indisponibilidad por bloqueo —en vez de una excepción explícita del
+cliente— es una manifestación válida de la pérdida de disponibilidad de escritura predicha por la
+teoría de consenso: con un solo nodo vivo de tres no existe mayoría para que Raft confirme ninguna
+escritura, exactamente el límite documentado en la Sección~\ref{sec:fundamento-teorico}. La
+recuperación es inmediata al ejecutar \texttt{docker start roach2}: con dos nodos vivos vuelve a
+haber quórum y la latencia regresa a valores normales (20.6/43.9\,ms). El detalle completo,
+incluyendo la secuencia exacta de comandos, está en la bitácora
+(\texttt{docs/evidencias/tolerancia\_fallos.md}) y el video
+(\texttt{docs/evidencias/tolerancia\_fallos.mp4}, 4:55~min).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{figuras/consola-recuperacion.jpg}
+\caption{Consola web de CockroachDB tras la recuperación final: los tres nodos en estado
+\texttt{LIVE}, 61 réplicas cada uno (captura del video de tolerancia a fallos).}
+\label{fig:consola-recuperacion}
+\end{figure}

@@ -1,0 +1,126 @@
+\section{Fundamento teórico}
+\label{sec:fundamento-teorico}
+
+\subsection{Modelo de bases de datos distribuidas}
+
+Siguiendo a Özsu y Valduriez~\cite{ozsu2011principles}, un sistema de base de datos distribuido
+(SBDD) se define como un conjunto de múltiples bases de datos lógicamente relacionadas,
+gestionadas por un único sistema y percibidas por el usuario final como una única base. Un SBDD
+persigue cuatro objetivos de diseño: \emph{transparencia} (de fragmentación, de replicación y de
+ubicación —el usuario no necesita saber dónde ni cómo se almacena físicamente cada fila—),
+\emph{autonomía local} de cada nodo, \emph{disponibilidad} ante fallos parciales, y
+\emph{escalabilidad horizontal} mediante la adición de nodos en vez de hardware más potente en un
+único nodo.
+
+La \emph{fragmentación horizontal} de una relación $R$ produce fragmentos $R_1, R_2, \dots, R_n$
+mediante selección sobre un atributo particionador: $R_i = \sigma_{p_i}(R)$, donde $\{p_i\}$ es un
+conjunto de predicados mutuamente excluyentes y colectivamente exhaustivos. Esta fragmentación es
+correcta si y solo si cumple tres condiciones:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Completitud}: todo elemento de $R$ pertenece a al menos un fragmento $R_i$.
+    \item \textbf{Reconstrucción}: $R = \bigcup_{i=1}^{n} R_i$, es decir, la unión de los
+        fragmentos reproduce exactamente la relación original.
+    \item \textbf{Disyunción}: $R_i \cap R_j = \emptyset$ para todo $i \neq j$, es decir, ningún
+        elemento pertenece a más de un fragmento.
+\end{itemize}
+
+Para una fragmentación por rango sobre un atributo $a$ con dominio totalmente ordenado, estas tres
+condiciones se satisfacen definiendo $n$ puntos de corte $c_0 = -\infty < c_1 < \dots < c_{n-1} <
+c_n = +\infty$ y cada fragmento como $R_i = \sigma_{c_{i-1} \leq a < c_i}(R)$: la completitud se
+sigue de que el dominio de $a$ está cubierto en su totalidad por los intervalos, la disyunción de
+que los intervalos son semiabiertos y consecutivos sin solape, y la reconstrucción de que la unión
+de predicados semiabiertos consecutivos es la tautología sobre el dominio de $a$. La
+Sección~\ref{sec:diseno-esquema} instancia este esquema con $a = \texttt{created\_at}$, $n = 4$ y
+verifica explícitamente las tres condiciones para el caso concreto del equipo.
+
+La \emph{replicación} complementa a la fragmentación para lograr disponibilidad: con un factor de
+replicación $f \geq 3$, un sistema tolera la pérdida simultánea de hasta
+$\lfloor (f-1)/2 \rfloor$ réplicas por rango de datos, siempre que se mantenga el quórum de
+escritura $\lceil f/2 \rceil + 1$. Con $f = 3$ (el valor usado en este despliegue), el quórum de
+escritura es 2 y la tolerancia es de 1 réplica: el clúster admite la caída de exactamente un nodo
+sin perder disponibilidad de escritura, pero no la de dos simultáneamente. Esta aritmética de
+quórum es la que se contrasta empíricamente en la Sección~\ref{sec:cluster-verificacion}.
+
+\subsection{Teorema CAP y modelo PACELC}
+
+El teorema CAP~\cite{brewer2012cap} establece que, ante una partición de red ($P$), un sistema
+distribuido no puede garantizar simultáneamente consistencia ($C$) y disponibilidad ($A$).
+Abadi~\cite{abadi2012consistency} extiende esta caracterización con PACELC, señalando que incluso
+en ausencia de partición ($E$, \emph{else}) todo sistema distribuido enfrenta un segundo
+\emph{trade-off} entre latencia ($L$) y consistencia ($C$). CockroachDB se posiciona
+explícitamente como un sistema PC/EC: prioriza consistencia sobre disponibilidad ante partición, y
+consistencia sobre latencia en operación normal, lo que se manifiesta de forma concreta en el
+comportamiento observado durante el incidente operativo documentado en la
+Sección~\ref{sec:cluster-verificacion} (rechazo de escrituras concurrentes conflictivas en vez de
+aceptarlas y arriesgar una lectura inconsistente posterior).
+
+Como resume Kleppmann~\cite{kleppmann2017ddia} en su tratamiento de sistemas de datos distribuidos
+modernos, la elección entre consistencia y disponibilidad no es una propiedad binaria del sistema
+completo, sino una decisión de diseño que puede —y en sistemas como CockroachDB, debe— tomarse de
+forma explícita y documentada para cada tipo de operación.
+
+\subsection{Consenso distribuido: Raft}
+
+El algoritmo Raft~\cite{ongaro2014raft} descompone el problema del consenso distribuido en tres
+subproblemas: \emph{elección de líder}, \emph{replicación de logs} y \emph{seguridad}
+(\emph{safety}). En CockroachDB, cada rango de datos constituye un grupo Raft independiente con su
+propio líder: una escritura se considera comprometida (\emph{committed}) cuando el líder del rango
+recibe confirmación de una mayoría estricta de sus réplicas, garantizando durabilidad frente a la
+caída de una minoría de nodos. Con el factor de replicación $f=3$ de la
+Sección~\ref{sec:fundamento-teorico} (quórum de escritura 2 de 3), esto explica directamente por
+qué el clúster tolera la caída de un nodo sin pérdida de disponibilidad de escritura, pero no la
+de dos nodos simultáneamente —ya no existe mayoría posible entre el único nodo restante—,
+comportamiento que se contrasta con la medición empírica de la
+Sección~\ref{sec:cluster-verificacion}.
+
+\subsection{Modelo de programación paralela}
+
+El modelo RDD (\emph{Resilient Distributed Dataset}) de Apache Spark~\cite{zaharia2012rdd} abstrae
+una colección distribuida \textbf{inmutable}, con \textbf{linaje} (\emph{lineage}) de
+transformaciones registrado en vez de los datos materializados en cada etapa intermedia,
+\textbf{evaluación perezosa} (\emph{lazy evaluation}, las transformaciones no se ejecutan hasta que
+una acción las requiere) y \textbf{tolerancia a fallos mediante recómputo}: si una partición se
+pierde, Spark la reconstruye reaplicando su linaje de transformaciones sobre los datos de origen,
+en vez de depender de una copia de respaldo replicada. Esta abstracción es la que sustenta el
+pipeline de la Sección~\ref{sec:pipeline-paralelo}, encadenando cinco transformaciones sin
+materializar resultados intermedios en disco entre cada una.
+
+La ganancia de paralelismo del pipeline se interpreta bajo dos modelos complementarios. La ley de
+Amdahl~\cite{amdahl1967validity} modela el \emph{speedup} $S(N)$ alcanzable con $N$ unidades de
+procesamiento para un problema de \textbf{tamaño fijo}, en función de la fracción $p$ del trabajo
+que es paralelizable:
+
+\begin{equation}
+    S(N) = \frac{1}{(1-p) + \dfrac{p}{N}}, \qquad \lim_{N \to \infty} S(N) = \frac{1}{1-p}
+    \label{eq:amdahl}
+\end{equation}
+
+La Ecuación~\ref{eq:amdahl} predice un límite asintótico de \emph{speedup} determinado
+enteramente por la fracción secuencial $(1-p)$ del pipeline —en este caso, principalmente la
+lectura inicial de Parquet y la escritura final de resultados, que no se benefician de más
+particiones más allá de cierto punto—. Gustafson~\cite{gustafson1988reevaluating} señala que esta
+formulación asume tamaño de problema constante, y propone en cambio fijar el tiempo total
+disponible y dejar crecer el tamaño del problema con $N$; bajo ese supuesto el \emph{speedup}
+escala de forma aproximadamente lineal en $N$ en vez de saturar. Ambos modelos se aplican en la
+Sección~\ref{sec:protocolo-resultados}: Amdahl para ajustar la fracción paralelizable observada
+del pipeline concreto (tamaño de dataset fijo en 600{,}000 filas para todos los niveles de $N$),
+y Gustafson como marco de interpretación de por qué, en un caso de uso real de un ISP donde el
+volumen de datos crece con el tiempo (no es fijo), el beneficio práctico del paralelismo tiende a
+ser mayor que el que predice Amdahl en aislamiento.
+
+\subsection{Diseño y análisis estadístico del experimento}
+
+El contraste de hipótesis del protocolo experimental (Sección~\ref{sec:protocolo-resultados})
+sigue el procedimiento estándar para muestras pareadas descrito por Jain~\cite{jain1991art} y
+Wohlin et al.~\cite{wohlin2012experimentation}: dado que cada repetición del pipeline paralelo y
+del baseline secuencial se ejecuta sobre el mismo dataset y en la misma posición de la secuencia
+de repeticiones, las mediciones no son independientes entre grupos, por lo que corresponde una
+prueba pareada en vez de una prueba de dos muestras independientes. Antes de aplicar una prueba
+paramétrica (\emph{t} de Student pareada) es necesario verificar el supuesto de normalidad de las
+diferencias emparejadas; se usa la prueba de Shapiro–Wilk para ello, y en caso de rechazarse la
+normalidad ($p \leq 0.05$) se recurre a la alternativa no paramétrica estándar para datos
+pareados, la prueba de rangos con signo de Wilcoxon. El intervalo de confianza al 95\% de cada
+nivel se calcula como $\bar{t} \pm 1.96 \cdot s/\sqrt{r}$, válido asintóticamente por el teorema
+central del límite para $r \geq 8$ muestras por nivel tras el descarte de calentamiento y
+enfriamiento descrito en la Sección~\ref{sec:protocolo-resultados}.

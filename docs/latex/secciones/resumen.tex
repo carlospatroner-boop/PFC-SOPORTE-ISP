@@ -1,0 +1,44 @@
+\begin{abstract}
+\noindent
+\textbf{Objetivo.} Consolidar la capa de datos distribuida y el pipeline analítico paralelo del
+Sistema de Soporte Técnico ISP (equipo ACC), evaluando su rendimiento y tolerancia a fallos. \textbf{Método.} Se fragmentó \texttt{tickets} por rango de \texttt{fecha\_apertura} sobre un
+clúster de tres nodos de CockroachDB, verificando completitud, reconstrucción y
+disyunción~\cite{ozsu2011principles}; se instrumentó con métricas Prometheus validadas con
+\texttt{promtool} y pruebas Testcontainers contra \texttt{SERIALIZABLE} real; y se rediseñó un
+pipeline de Spark sobre 600{,}000 incidencias con cinco transformaciones, contrastado mediante
+protocolo experimental (Jain~\cite{jain1991art}, Wohlin et al.~\cite{wohlin2012experimentation})
+frente a un baseline en pandas.
+\textbf{Resultados.} El clúster aplica correctamente aislamiento serializable ante escrituras
+concurrentes conflictivas (\texttt{SQLSTATE 40001}), las tres métricas pasan el \emph{linter} de
+Prometheus sin advertencias, y el pipeline detecta 380{,}753 incidencias reincidentes (68.3\%)
+sobre 557{,}701 filas filtradas. El protocolo estadístico completo (50 corridas) muestra que,
+para este volumen de datos, el baseline secuencial en pandas fue significativamente más rápido que
+Spark incluso con ocho núcleos ($p \approx 5\times10^{-10}$), aunque Spark sí exhibe un
+\emph{speedup} interno real al escalar de uno a ocho núcleos ($p$ de Amdahl $\approx 0.53$). La
+tolerancia a fallos permanece pendiente. \textbf{Conclusión.} La fragmentación y la
+instrumentación aplicadas son correctas y verificables; el protocolo revela además que el
+paralelismo distribuido no es gratuito y solo se justifica a partir de cierta escala de datos.
+\end{abstract}
+
+\begin{center}\textbf{Abstract}\end{center}
+\begin{abstract}
+\noindent
+\textbf{Objective.} To consolidate the distributed data layer and the parallel analytics pipeline
+of the ISP Technical Support Ticket Management System (team ACC), evaluating their performance
+and fault tolerance. \textbf{Method.}
+The \texttt{tickets} table was fragmented by range on \texttt{fecha\_apertura} over a three-node
+CockroachDB cluster, verifying completeness, reconstruction and
+disjointness~\cite{ozsu2011principles}; the service was instrumented with Prometheus metrics
+validated with \texttt{promtool} and Testcontainers tests against real \texttt{SERIALIZABLE}
+isolation; and a Spark pipeline was redesigned over 600,000 incidents with five transformations,
+contrasted via an experimental protocol against a pandas baseline. \textbf{Results.} The cluster correctly enforces
+serializable isolation under conflicting concurrent writes (\texttt{SQLSTATE 40001}), all three
+required metrics pass the Prometheus linter without warnings, and the pipeline detects 380,753
+recurring incidents (68.3\%) out of 557,701 filtered rows. The full statistical protocol (50
+trials) shows that, at this data volume, the sequential pandas baseline was significantly faster
+than Spark even at eight cores ($p \approx 5\times10^{-10}$), although Spark does show a real
+internal speedup when scaling from one to eight cores (Amdahl $p \approx 0.53$). Fault-tolerance
+characterization remains pending. \textbf{Conclusion.} The fragmentation and instrumentation
+applied are correct and empirically verifiable; the protocol further reveals that distributed
+parallelism is not free and only pays off past a certain data scale.
+\end{abstract}

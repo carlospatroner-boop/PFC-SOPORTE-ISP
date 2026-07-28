@@ -1,0 +1,157 @@
+\section{Diseño del esquema y fragmentación}
+\label{sec:diseno-esquema}
+
+\subsection{Esquema físico}
+
+La Figura~\ref{fig:c4-nivel2} sitúa la capa de datos dentro de la arquitectura completa del
+sistema: los cinco microservicios heredados de la Entrega 2 no cambian de contrato, mientras que
+el clúster de CockroachDB (fragmentado en esta entrega) y el pipeline de Spark (componente nuevo)
+se destacan explícitamente.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{figuras/c4-nivel2.png}
+\caption{Diagrama de contenedores (C4 Nivel 2) del sistema tras la Entrega 3. Ámbar: componente
+fragmentado/refactorizado en E3. Verde azulado: componente nuevo en E3.}
+\label{fig:c4-nivel2}
+\end{figure}
+
+El diagrama entidad-relación completo de \texttt{ticket\_db} —la base propia de
+\texttt{ticket-service} dentro del clúster de tres nodos de CockroachDB— se documenta en
+\texttt{docs/diagrams/db-schema.md}. La tabla \texttt{tickets} es la de mayor cardinalidad y la
+única fragmentada; \texttt{technicians} es una dimensión pequeña que no requiere fragmentación. La
+Tabla~\ref{tab:esquema-tickets} detalla las columnas relevantes para la política de fragmentación.
+
+\begin{table}[H]
+\centering
+\caption{Columnas relevantes de \texttt{tickets} tras el rediseño de la Entrega 3}
+\label{tab:esquema-tickets}
+\begin{tabular}{@{}llp{6.5cm}@{}}
+\toprule
+\textbf{Columna} & \textbf{Tipo} & \textbf{Rol} \\
+\midrule
+\texttt{created\_at} & \texttt{TIMESTAMPTZ} & Primer componente de la PK; columna de fragmentación \\
+\texttt{id}           & \texttt{UUID}        & Segundo componente de la PK; respaldado además por índice único \texttt{tickets\_id\_key} \\
+\texttt{zone}         & \texttt{STRING}      & Columna de negocio (RBAC de técnico, reportes); indexada, ya no es clave de fragmentación \\
+\texttt{client\_id}   & \texttt{UUID}        & Identidad del cliente, resuelta a nivel de aplicación vía JWT de \texttt{auth-service} \\
+\texttt{status}       & \texttt{STRING}      & Indexada (\texttt{idx\_tickets\_status}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Política de fragmentación}
+
+El fragmento del esquema en el Listado~\ref{lst:init-db} muestra la definición efectiva de la
+tabla \texttt{tickets} tal como se aplica en \texttt{db-cluster/scripts/init\_db.sql}.
+
+\begin{lstlisting}[language=SQL, caption={Fragmentación por rango de \texttt{tickets} (extracto de \texttt{init\_db.sql})}, label={lst:init-db}]
+CREATE TABLE IF NOT EXISTS tickets (
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id              UUID NOT NULL DEFAULT gen_random_uuid(),
+    zone            STRING NOT NULL,
+    client_id       UUID NOT NULL,
+    technician_id   UUID REFERENCES technicians(id),
+    category        STRING,
+    priority        STRING,
+    status          STRING NOT NULL DEFAULT 'NUEVO',
+    description     STRING,
+    sla_deadline    TIMESTAMPTZ,
+    resolved_at     TIMESTAMPTZ,
+    sla_breached    BOOL DEFAULT FALSE,
+    PRIMARY KEY (created_at, id)
+) PARTITION BY RANGE (created_at) (
+    PARTITION tickets_2026_q1 VALUES FROM (MINVALUE) TO ('2026-04-01T00:00:00Z'),
+    PARTITION tickets_2026_q2 VALUES FROM ('2026-04-01T00:00:00Z') TO ('2026-07-01T00:00:00Z'),
+    PARTITION tickets_2026_q3 VALUES FROM ('2026-07-01T00:00:00Z') TO ('2026-10-01T00:00:00Z'),
+    PARTITION tickets_2026_q4 VALUES FROM ('2026-10-01T00:00:00Z') TO (MAXVALUE)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS tickets_id_key ON tickets (id);
+CREATE INDEX IF NOT EXISTS idx_tickets_zone ON tickets (zone);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status);
+\end{lstlisting}
+
+Esta sintaxis sigue el mecanismo de particionamiento declarativo documentado oficialmente por
+Cockroach Labs~\cite{cockroachlabs2024docs}, que exige que la columna de partición sea el primer
+componente de la clave primaria para que el optimizador pueda aplicar poda de particiones
+(\emph{partition pruning}) en tiempo de planificación de consultas. Esta decisión reemplaza el
+diseño original de la Entrega 2, que fragmentaba \texttt{tickets} por
+zona geográfica (\texttt{PARTITION BY LIST (zone)}). El cambio fue motivado por un requisito
+explícito y no negociable de la guía oficial de la Entrega 3 para el equipo ACC: fragmentación
+horizontal de \texttt{tickets} por \texttt{fecha\_apertura}. El razonamiento completo de este
+cambio, incluyendo los \emph{trade-offs} aceptados, se documenta en el ADR-0003
+(\texttt{docs/adr/0003-sharding-policy.md}) y se resume a continuación.
+
+\subsection{Verificación formal de corrección}
+
+Con $a = \texttt{created\_at}$ y los cuatro puntos de corte del Listado~\ref{lst:init-db}
+($c_0 = \text{MINVALUE}$, $c_1 = \text{2026-04-01}$, $c_2 = \text{2026-07-01}$,
+$c_3 = \text{2026-10-01}$, $c_4 = \text{MAXVALUE}$), se verifican las tres condiciones del
+marco de Özsu y Valduriez~\cite{ozsu2011principles} introducidas en la
+Sección~\ref{sec:fundamento-teorico}:
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Completitud}: la columna \texttt{created\_at} es \texttt{NOT NULL} con valor
+        por defecto \texttt{now()}, por lo que todo ticket tiene un valor definido de
+        \texttt{created\_at} y, en consecuencia, pertenece a exactamente una de las cuatro
+        particiones trimestrales.
+    \item \textbf{Reconstrucción}: los rangos
+        $[\text{MINVALUE}, c_1) \cup [c_1, c_2) \cup [c_2, c_3) \cup [c_3, \text{MAXVALUE})$
+        cubren la totalidad del dominio de \texttt{TIMESTAMPTZ}; la unión \texttt{UNION ALL} de
+        las cuatro particiones reconstruye exactamente la tabla \texttt{tickets} sin pérdida de
+        filas.
+    \item \textbf{Disyunción}: la semántica de \texttt{PARTITION BY RANGE} en CockroachDB define
+        cada límite como inclusivo por la izquierda y exclusivo por la derecha
+        (\texttt{VALUES FROM ... TO ...}); por construcción, ningún valor de \texttt{created\_at}
+        satisface simultáneamente los predicados de dos particiones distintas.
+\end{itemize}
+
+Adicionalmente, dado que \texttt{id} deja de ser autosuficiente como punto de acceso —la
+aplicación recibe un UUID de ticket sin conocer su \texttt{created\_at} de antemano en los
+\emph{endpoints} \texttt{GET}/\texttt{PATCH} sobre \texttt{/api/v1/tickets/\{id\}}—, se añadió el índice único secundario
+\texttt{tickets\_id\_key}, usado por \texttt{TicketRepository.findByTicketId(UUID)} para resolver
+ese acceso con un único salto índice→tabla, sin necesidad de escanear las cuatro particiones.
+
+\subsection{Colocalización con clientes y limitación arquitectónica}
+
+La guía de la Entrega 3 pide, además de la fragmentación por fecha, colocalizar \texttt{tickets}
+con \texttt{clientes} por \texttt{client\_id}, lo que en CockroachDB se implementaría típicamente
+con \texttt{INTERLEAVE IN PARENT} o una clave compartida dentro de la misma base de datos. En la
+arquitectura de microservicios heredada de la Entrega 2, los clientes son propiedad exclusiva de
+\texttt{auth-service} (\texttt{auth\_db.users}), una base de datos físicamente distinta de
+\texttt{ticket\_db} — cada microservicio es dueño de su propio esquema, sin acceso cruzado directo
+a la base de otro. Forzar una colocalización física en el sentido literal de CockroachDB
+requeriría fusionar ambas bases de datos, violando el límite de propiedad de datos entre servicios
+que es una decisión arquitectónica deliberada, no un descuido, de la Entrega 2. Se documenta esta
+tensión explícitamente en el ADR-0003 en vez de forzar una colocalización artificial: la columna
+\texttt{tickets.client\_id} permanece indexada para soportar las consultas
+\texttt{findByClientId}/\texttt{findByClientIdAndStatus}, y la resolución de identidad del cliente
+ocurre a nivel de aplicación mediante el JWT emitido por \texttt{auth-service}, no a nivel de
+almacenamiento físico compartido.
+
+\subsection{Política de replicación}
+
+Como la fragmentación pasó de ser por zona a ser por fecha, ya no existe una correspondencia 1:1
+entre una partición y la \emph{locality} de un nodo específico: una partición trimestral contiene
+tickets de las tres zonas geográficas mezclados. En consecuencia, \texttt{zones.sql}
+(Listado~\ref{lst:zones}) ya no ancla particiones a nodos por restricción de \emph{locality};
+exige uniformemente un factor de replicación 3 sobre toda la tabla, de forma que la pérdida de
+cualquier nodo individual del clúster de tres no comprometa la disponibilidad de escritura
+(2 de 3 réplicas siguen constituyendo mayoría para Raft~\cite{ongaro2014raft}).
+
+\begin{lstlisting}[language=SQL, caption={Política de replicación uniforme (\texttt{zones.sql})}, label={lst:zones}]
+ALTER TABLE tickets CONFIGURE ZONE USING num_replicas = 3;
+\end{lstlisting}
+
+\subsection{Trade-offs aceptados}
+
+El rediseño no es gratuito: las consultas filtradas por zona —el filtro más frecuente en la
+operación real de un ISP, usado por el RBAC de técnico y por la mayoría de los reportes— dejan de
+beneficiarse de poda de particiones y pasan a resolverse mediante \emph{scatter-gather} sobre las
+cuatro particiones trimestrales, mientras que antes se resolvían dentro de una sola partición. Este
+\emph{trade-off}, junto con el beneficio simétrico obtenido por las consultas de rango temporal
+(la mayoría de los reportes reales: ``tickets abiertos hoy'', ``tickets del último trimestre''), se
+mide de forma comparativa con \texttt{EXPLAIN ANALYZE} sobre las cinco consultas representativas de
+\texttt{db-cluster/scripts/queries\_bench.sql} (lectura por \texttt{id}, rango de fecha, filtro por
+zona, agregación de incumplimiento de SLA, y \emph{join} con técnicos), documentadas junto con sus
+planes de ejecución en el Anexo correspondiente del repositorio.

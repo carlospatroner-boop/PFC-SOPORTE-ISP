@@ -1,0 +1,12 @@
+{
+  "master": "pandas-sequential",
+  "timings": {
+    "load": 1.550320116999501,
+    "t1_filter_valid_resolved": 0.8644068499997957,
+    "t2_join_clients": 0.7397104890005721,
+    "t3_recurrence_window": 2.9560420559973863,
+    "t4_recurrence_flag": 0.47078340699954424,
+    "t5_ml_clustering": 36.875924283998756,
+    "total": 43.457187202995556
+  }
+}

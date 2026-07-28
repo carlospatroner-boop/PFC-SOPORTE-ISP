@@ -136,7 +136,7 @@ def analyze(raw_samples: dict, results_dir: Path) -> dict:
     differences = sequential - parallel
 
     shapiro_stat, shapiro_p = stats.shapiro(differences)
-    normal = shapiro_p > 0.05
+    normal = bool(shapiro_p > 0.05)
 
     if normal:
         test_name = "prueba t pareada (t-test relacionado)"
@@ -145,7 +145,9 @@ def analyze(raw_samples: dict, results_dir: Path) -> dict:
         test_name = "Wilcoxon signed-rank"
         stat, p_value = stats.wilcoxon(sequential, parallel)
 
-    reject_h0 = p_value < 0.05 and differences.mean() > 0
+    # bool(...) explicito: numpy.bool_ (resultado de comparar escalares numpy) no es
+    # serializable por json.dump, que solo reconoce el tipo bool nativo de Python.
+    reject_h0 = bool(p_value < 0.05 and differences.mean() > 0)
     stats_result = {
         "hipotesis": "H1: el pipeline paralelo (N=8) tiene menor tiempo medio que el baseline secuencial",
         "shapiro_wilk": {"estadistico": float(shapiro_stat), "p_valor": float(shapiro_p), "normal": normal},

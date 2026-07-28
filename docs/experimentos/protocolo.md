@@ -88,8 +88,34 @@ manuscrito): `raw.csv` (las 50 repeticiones crudas, incluidas las descartadas, c
 
 ## 7. Resultados
 
-*Pendiente de ejecución* — el protocolo completo toma ~75-90 minutos (50 corridas). Esta sección
-se completa con los números reales tras correr `protocol_experiment.py` (ver Sección 6).
+Ejecutado el 2026-07-27 (50 corridas reales, ~2 horas en este entorno — más de los 75-90 minutos
+estimados, por el costo de arranque de una `SparkSession` nueva en cada repetición). Artefactos en
+`spark/results/protocol/`: `raw.csv`, `summary_stats.csv`, `stats_test.json`, `boxplot.png`,
+`amdahl_fit.json`.
+
+| Nivel | Media (s) | Desv. típica (s) | IC95% |
+|---|---|---|---|
+| Baseline (pandas) | 25.42 | 4.52 | [22.29, 28.55] |
+| Spark `local[1]` | 235.22 | 5.58 | [231.35, 239.09] |
+| Spark `local[2]` | 163.81 | 3.92 | [161.10, 166.53] |
+| Spark `local[4]` | 138.92 | 5.15 | [135.35, 142.49] |
+| Spark `local[8]` | 129.36 | 4.55 | [126.21, 132.51] |
+
+**Contraste de H1**: Shapiro-Wilk sobre las diferencias emparejadas (baseline − Spark `local[8]`)
+no rechaza normalidad (W=0.963, p=0.835) → prueba t pareada: t=-47.19, p≈5.02e-10, diferencia
+media -103.94s. **Resultado**: no se rechaza H0 en el sentido de H1 — el baseline secuencial en
+pandas fue significativamente **más rápido** que Spark incluso en `local[8]`, no al revés. Para
+este volumen de datos (600,000 filas, cabe en memoria de un solo proceso), el costo fijo de
+inicializar una `SparkSession` por repetición domina sobre cualquier ganancia de paralelismo real.
+
+**Ajuste de Amdahl (escalado interno de Spark, referencia `local[1]`)**: speedup observado
+S(2)=1.44, S(4)=1.69, S(8)=1.82 → p≈0.530, S(∞)≈2.13, N para 90% de S(∞) ≈ 10.1. Es decir, dentro
+de la propia ejecución de Spark el paralelismo sí funciona (más núcleos → menos tiempo), solo que
+partiendo de una base ~9x más lenta que pandas para este tamaño de dataset.
+
+Ver la discusión completa de por qué el baseline ganó (costo de arranque de JVM, dataset que cabe
+en memoria de un solo nodo, dominancia de la etapa de *clustering*) en la Sección "Protocolo y
+resultados" del documento LaTeX (`docs/latex/secciones/protocolo_resultados.tex`).
 
 ## Referencias
 

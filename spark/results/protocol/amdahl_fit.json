@@ -1,0 +1,18 @@
+{
+  "referencia": "T(N=1) tomado como referencia interna de Spark, no el baseline pandas",
+  "tiempos_medios_s": {
+    "1": 235.22,
+    "2": 163.813,
+    "4": 138.92,
+    "8": 129.359
+  },
+  "speedup_observado": {
+    "1": 1.0,
+    "2": 1.4359055752595948,
+    "4": 1.6932047221422404,
+    "8": 1.8183504819919756
+  },
+  "p_ajustado": 0.5298,
+  "s_infinito": 2.1269,
+  "n_para_90pct_s_infinito": 10.14
+}

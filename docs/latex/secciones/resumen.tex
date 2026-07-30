@@ -14,8 +14,11 @@ Prometheus sin advertencias, y el pipeline detecta 380{,}753 incidencias reincid
 sobre 557{,}701 filas filtradas. El protocolo estadístico completo (50 corridas) muestra que,
 para este volumen de datos, el baseline secuencial en pandas fue significativamente más rápido que
 Spark incluso con ocho núcleos ($p \approx 5\times10^{-10}$), aunque Spark sí exhibe un
-\emph{speedup} interno real al escalar de uno a ocho núcleos ($p$ de Amdahl $\approx 0.53$). La
-tolerancia a fallos permanece pendiente. \textbf{Conclusión.} La fragmentación y la
+\emph{speedup} interno real al escalar de uno a ocho núcleos ($p$ de Amdahl $\approx 0.53$). El
+clúster tolera la caída de un nodo sin pérdida de datos ni de disponibilidad de escritura (0
+errores en 691 filas, pico de latencia P95 de 1.59\,s durante la reelección de líder), y pierde
+disponibilidad de escritura durante 62\,s al caer dos de tres nodos, recuperándose de inmediato al
+reincorporar un nodo. \textbf{Conclusión.} La fragmentación y la
 instrumentación aplicadas son correctas y verificables; el protocolo revela además que el
 paralelismo distribuido no es gratuito y solo se justifica a partir de cierta escala de datos.
 \end{abstract}
@@ -37,8 +40,10 @@ required metrics pass the Prometheus linter without warnings, and the pipeline d
 recurring incidents (68.3\%) out of 557,701 filtered rows. The full statistical protocol (50
 trials) shows that, at this data volume, the sequential pandas baseline was significantly faster
 than Spark even at eight cores ($p \approx 5\times10^{-10}$), although Spark does show a real
-internal speedup when scaling from one to eight cores (Amdahl $p \approx 0.53$). Fault-tolerance
-characterization remains pending. \textbf{Conclusion.} The fragmentation and instrumentation
+internal speedup when scaling from one to eight cores (Amdahl $p \approx 0.53$). The cluster
+tolerates a single-node failure without data loss or write-availability loss (0 errors across 691
+rows, peak P95 latency of 1.59\,s during leader re-election), and loses write availability for
+62\,s when two of three nodes go down, recovering immediately once a node rejoins. \textbf{Conclusion.} The fragmentation and instrumentation
 applied are correct and empirically verifiable; the protocol further reveals that distributed
 parallelism is not free and only pays off past a certain data scale.
 \end{abstract}

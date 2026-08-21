@@ -1,0 +1,12 @@
+{
+  "master": "local[4]",
+  "timings": {
+    "load": 30.631380483000157,
+    "t1_filter_valid_resolved": 13.417973732000064,
+    "t2_join_clients": 35.719872628000076,
+    "t3_recurrence_window": 15.776029094000023,
+    "t4_recurrence_flag": 11.139581128999907,
+    "t5_ml_clustering": 128.7774893149999,
+    "total": 235.46232638100014
+  }
+}

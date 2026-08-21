@@ -6,6 +6,7 @@ import ec.edu.uteq.soporte.authservice.domain.User;
 import ec.edu.uteq.soporte.authservice.exception.InvalidCredentialsException;
 import ec.edu.uteq.soporte.authservice.exception.InvalidRequestException;
 import ec.edu.uteq.soporte.authservice.exception.TokenReuseDetectedException;
+import ec.edu.uteq.soporte.authservice.messaging.TechnicianEventPublisher;
 import ec.edu.uteq.soporte.authservice.repository.RefreshTokenRepository;
 import ec.edu.uteq.soporte.authservice.repository.UserRepository;
 import ec.edu.uteq.soporte.authservice.web.dto.AuthResponse;
@@ -52,13 +53,17 @@ class AuthServiceTest {
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private TechnicianEventPublisher technicianEventPublisher;
+
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, refreshTokenRepository, jwtService, passwordEncoder);
+        authService = new AuthService(
+                userRepository, refreshTokenRepository, jwtService, passwordEncoder, technicianEventPublisher);
 
         // Simulan lo que Hibernate hace de verdad al persistir (asignar el id generado);
         // lenient() porque no todos los tests ejercitan ambos repositorios.
@@ -136,6 +141,25 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.createUserAsAdmin(
                 new CreateUserRequest("otro@test.com", "Passw0rd!", "Otro", Role.CLIENTE, "QUEVEDO_NORTE")))
                 .isInstanceOf(InvalidRequestException.class);
+    }
+
+    @Test
+    void createUserAsAdminPublishesTechnicianCreatedOnlyForTecnicoRole() {
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+
+        authService.createUserAsAdmin(
+                new CreateUserRequest("tec2@test.com", "Passw0rd!", "Tecnico Dos", Role.TECNICO, "QUEVEDO_SUR"));
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(technicianEventPublisher).publishCreated(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("tec2@test.com");
+
+        authService.createUserAsAdmin(
+                new CreateUserRequest("cliente2@test.com", "Passw0rd!", "Cliente Dos", Role.CLIENTE, null));
+
+        // Sigue habiendo una sola invocacion (la del TECNICO de arriba) -- CLIENTE/ADMIN
+        // nunca disparan la sincronizacion con ticket-service.
+        verify(technicianEventPublisher, org.mockito.Mockito.times(1)).publishCreated(any(User.class));
     }
 
     @Test

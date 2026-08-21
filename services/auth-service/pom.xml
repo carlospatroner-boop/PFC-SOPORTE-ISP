@@ -69,6 +69,16 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Publica "technician.created" cuando se da de alta un usuario TECNICO, para que
+             ticket-service sincronice su propia tabla technicians (misma Saga por
+             coreografia que ya usan ticket-service/ai-service/notification-service, ver
+             ADR-0004). Antes de esto, un TECNICO creado desde el panel de Admin nunca
+             llegaba a ticket_db y no se podia asignar (violaba la FK tickets_technician_id_fkey). -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

@@ -1,0 +1,65 @@
+server:
+  port: ${SERVER_PORT:8000}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      # Enrutamiento estatico por prefijo de path -- no hay descubrimiento de servicios
+      # (Eureka/Consul) en este PFC, asi que cada "uri" apunta a la variable de entorno
+      # del microservicio real (mismo patron que VITE_*_BASE_URL en apps/web y
+      # *_BASE_URL en apps/mobile, para que docker-compose pueda sobreescribirla con el
+      # nombre del contenedor en vez de localhost).
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URI:http://localhost:8001}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: ticket-service
+          uri: ${TICKET_SERVICE_URI:http://localhost:8002}
+          predicates:
+            - Path=/api/v1/tickets/**
+        - id: notification-service
+          uri: ${NOTIFICATION_SERVICE_URI:http://localhost:8003}
+          predicates:
+            - Path=/api/v1/notifications/**
+        - id: ai-service
+          uri: ${AI_SERVICE_URI:http://localhost:8004}
+          predicates:
+            - Path=/api/v1/ai/**
+        - id: report-service
+          uri: ${REPORT_SERVICE_URI:http://localhost:8005}
+          predicates:
+            - Path=/api/v1/reports/**
+      # CORS vive UNICAMENTE aqui desde que existe el gateway. Los CorsConfig.java que tenian
+      # auth-service/ticket-service/report-service (de cuando el navegador les hablaba
+      # directo, ver E2/E3) se eliminaron: si el gateway agrega "Access-Control-Allow-Origin"
+      # y el microservicio downstream tambien lo agrega, el navegador recibe la cabecera
+      # duplicada y rechaza la respuesta entera con "multiple values ... only one is
+      # allowed" -- se reprodujo en vivo al probar el login desde apps/web contra este
+      # gateway y quedo documentado aqui para que nadie la vuelva a agregar downstream.
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOriginPatterns: "*"
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders: "*"
+            maxAge: 3600
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: api-gateway
+
+logging:
+  level:
+    ec.edu.uteq.soporte: INFO
+    org.springframework.cloud.gateway: INFO

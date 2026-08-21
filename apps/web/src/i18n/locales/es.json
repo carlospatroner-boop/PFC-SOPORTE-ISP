@@ -1,0 +1,143 @@
+{
+  "app": {
+    "title": "Soporte ISP — Consola"
+  },
+  "role": {
+    "ADMIN": "Administrador",
+    "TECNICO": "Técnico",
+    "CLIENTE": "Cliente"
+  },
+  "nav": {
+    "console": "Consola",
+    "admin": "Administración",
+    "reports": "Reportes",
+    "settings": "Ajustes",
+    "about": "Acerca de",
+    "logout": "Salir"
+  },
+  "login": {
+    "brand": "SOPORTE ISP",
+    "title": "Inicia sesión",
+    "email": "Correo",
+    "password": "Contraseña",
+    "submit": "Ingresar",
+    "loading": "Ingresando…",
+    "errorEmpty": "Ingresa correo y contraseña",
+    "errorGeneric": "No se pudo iniciar sesión"
+  },
+  "console": {
+    "title": "Consola de operadores",
+    "subtitle": "Vista de SLA por zona y por técnico",
+    "search": "Buscar por descripción…",
+    "filterZone": "Zona",
+    "filterStatus": "Estado",
+    "filterAll": "Todas",
+    "newTicket": "Nueva solicitud",
+    "kpi": {
+      "total": "Tickets totales",
+      "escalated": "Escalados",
+      "breached": "SLA vencido"
+    },
+    "table": {
+      "zone": "Zona",
+      "technician": "Técnico",
+      "status": "Estado",
+      "priority": "Prioridad",
+      "sla": "SLA",
+      "description": "Descripción",
+      "actions": "Acciones"
+    },
+    "actions": {
+      "assignToMe": "Asignarme",
+      "assignTo": "Asignar a técnico…",
+      "noTechniciansInZone": "Sin técnicos en esta zona"
+    },
+    "createModal": {
+      "title": "Nueva solicitud de soporte",
+      "zone": "Zona",
+      "ticketTitle": "Título",
+      "description": "Descripción del problema",
+      "contactPhone": "Teléfono de contacto (opcional)",
+      "address": "Dirección (opcional)",
+      "cancel": "Cancelar",
+      "submit": "Crear solicitud",
+      "submitting": "Creando…",
+      "errorEmpty": "Completa el título y la descripción",
+      "errorGeneric": "No se pudo crear la solicitud"
+    },
+    "slaBreached": "Vencido",
+    "slaOk": "OK",
+    "unassigned": "Sin asignar",
+    "empty": "No hay tickets con estos filtros",
+    "error": "No se pudieron cargar los tickets"
+  },
+  "admin": {
+    "title": "Administración",
+    "subtitle": "Crear cuentas CLIENTE/TÉCNICO/ADMIN (solo visible para ADMIN)",
+    "form": {
+      "title": "Crear cuenta",
+      "email": "Correo",
+      "password": "Contraseña",
+      "fullName": "Nombre completo",
+      "role": "Rol",
+      "zone": "Zona (técnico)",
+      "submit": "+ Crear cuenta",
+      "submitting": "Creando…",
+      "errorEmpty": "Completa correo, contraseña y nombre",
+      "errorGeneric": "No se pudo crear la cuenta",
+      "success": "Cuenta creada: {{email}}"
+    },
+    "roles": {
+      "CLIENTE": "Cliente",
+      "TECNICO": "Técnico",
+      "ADMIN": "Admin"
+    },
+    "list": {
+      "title": "Cuentas registradas",
+      "loading": "Cargando cuentas…",
+      "error": "No se pudieron cargar las cuentas",
+      "columns": {
+        "name": "Nombre",
+        "email": "Correo",
+        "role": "Rol",
+        "zone": "Zona"
+      }
+    }
+  },
+  "reports": {
+    "title": "Reportes",
+    "subtitle": "Modelo de lectura CQRS de report-service (solo visible para ADMIN)",
+    "loading": "Cargando reportes…",
+    "error": "No se pudieron cargar los reportes",
+    "total": "{{count}} tickets en total",
+    "byStatus": "Tickets por estado",
+    "byZone": "Tickets por zona",
+    "byCategory": "Tickets por categoría"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "language": "Idioma",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro"
+  },
+  "about": {
+    "title": "Acerca de",
+    "body": "Sistema de Gestión de Solicitudes de Soporte Técnico de Internet — Proyecto Fin de Curso, equipo ACC. Aplicaciones Distribuidas (ISR-701), Universidad Técnica Estatal de Quevedo.",
+    "version": "Entrega 4"
+  },
+  "status": {
+    "NUEVO": "Nuevo",
+    "ASIGNADO": "Asignado",
+    "EN_PROGRESO": "En progreso",
+    "ESCALADO": "Escalado",
+    "RESUELTO": "Resuelto",
+    "CERRADO": "Cerrado"
+  },
+  "priority": {
+    "CRITICO": "Crítico",
+    "ALTO": "Alto",
+    "MEDIO": "Medio",
+    "BAJO": "Bajo"
+  }
+}

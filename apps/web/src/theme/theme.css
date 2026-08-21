@@ -1,0 +1,122 @@
+/* Paleta semantica compartida con el resto del proyecto (mazo de diapositivas y app movil):
+   navy / teal / ambar + neutros. Ver apps/mobile/.../ui/theme/StatusColors.kt para el mismo
+   mapeo de colores por estado, para que un color signifique lo mismo en toda la Entrega 4. */
+:root,
+[data-theme='light'] {
+  --color-navy: #1e3a5f;
+  --color-teal: #0f6b5c;
+  --color-amber: #8a5a00;
+  --color-red: #b3261e;
+  --color-green: #2e7d32;
+  --color-gray: #616161;
+
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --text-muted: #595959;
+  --border: #e2e5e9;
+
+  --status-nuevo: var(--color-navy);
+  --status-asignado: var(--color-amber);
+  --status-en-progreso: var(--color-teal);
+  --status-escalado: var(--color-red);
+  --status-resuelto: var(--color-green);
+  --status-cerrado: var(--color-gray);
+}
+
+[data-theme='dark'] {
+  --bg: #14181f;
+  --surface: #1d232c;
+  --text: #f0f2f5;
+  --text-muted: #a7b0bd;
+  --border: #2c3440;
+
+  --status-nuevo: #9db8da;
+  --status-asignado: #dbae5c;
+  --status-en-progreso: #7fcbb8;
+  --status-escalado: #ef5350;
+  --status-resuelto: #66bb6a;
+  --status-cerrado: #9e9e9e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+}
+
+/* Estados que los estilos inline (CSS-in-JS) del resto del proyecto no pueden expresar
+   -- ver LoginPage.tsx. Con className en vez de style para estos casos puntuales. */
+.field-input {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field-input:focus {
+  outline: none;
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 3px rgba(15, 107, 92, 0.15);
+}
+.btn-accent {
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+.btn-accent:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn-accent:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.icon-toggle {
+  transition: color 0.15s ease;
+}
+.icon-toggle:hover {
+  color: var(--text) !important;
+}
+
+/* Tabla de tickets (ConsolePage) -- rayado + hover que un objeto de estilo inline no puede
+   expresar, y encabezado pegajoso dentro de su propio contenedor con scroll (no de toda la
+   pagina: el header de AppLayout no es sticky, asi que "pegar" el thead al viewport se hace
+   con un panel de scroll propio en vez de al body). */
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.data-table tbody tr:nth-child(even) {
+  background: var(--bg);
+}
+.data-table tbody tr:hover {
+  background: rgba(15, 107, 92, 0.08);
+}
+.data-table tbody td {
+  border-bottom: 1px solid var(--border);
+}
+.assign-btn {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.assign-btn:hover:not(:disabled) {
+  background: var(--color-teal) !important;
+  color: #fff !important;
+}
+
+/* Skeleton de carga: franjas grises con un brillo que se desliza, en vez del texto plano
+   "Cargando..." -- se usa mientras useTickets.loading esta en true (carga inicial o cambio
+   de filtro). */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.skeleton-row {
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%);
+  background-size: 400px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}

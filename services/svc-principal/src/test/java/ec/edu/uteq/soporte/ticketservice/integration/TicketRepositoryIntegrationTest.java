@@ -1,14 +1,17 @@
 package ec.edu.uteq.soporte.ticketservice.integration;
 
 import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketRepository;
 import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
 import ec.edu.uteq.soporte.ticketservice.domain.Zone;
-import ec.edu.uteq.soporte.ticketservice.repository.TicketRepository;
+import ec.edu.uteq.soporte.ticketservice.infrastructure.persistence.TicketMapper;
+import ec.edu.uteq.soporte.ticketservice.infrastructure.persistence.TicketRepositoryAdapter;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -34,26 +37,29 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Prueba de integracion real (D3.1 de la rubrica de Entrega 3, Modulo A paso 6):
- * levanta un CockroachDB real en un contenedor Docker via Testcontainers -- no
- * depende de que el cluster de db-cluster/ este corriendo, ni usa una base
- * embebida (H2) que no reproduciria el comportamiento real de CockroachDB
- * (aislamiento serializable, tipos STRING/UUID nativos, etc).
+ * Prueba de integracion real (Modulo A, item 6 de la guia de E4 -- "excepto las pruebas de
+ * integracion" del punto 5): levanta un CockroachDB real en un contenedor Docker via
+ * Testcontainers -- no depende de que el cluster de db-cluster/ este corriendo, ni usa una
+ * base embebida (H2) que no reproduciria el comportamiento real de CockroachDB (aislamiento
+ * serializable, tipos STRING/UUID nativos, etc).
+ *
+ * A diferencia de antes del refactor de capas, esta prueba ahora ejercita el mismo puerto de
+ * dominio (TicketRepository) que usan los manejadores de comando en produccion -- @DataJpaTest
+ * solo auto-descubre entidades JPA y repositorios Spring Data por si solo, asi que
+ * TicketRepositoryAdapter y TicketMapper (componentes normales, no repositorios Spring Data)
+ * se traen explicitamente con @Import para que @Autowired TicketRepository resuelva al mismo
+ * adaptador real que usa la aplicacion.
  *
  * Dos pruebas:
- *  1) Un roundtrip save/findByTicketId contra el CockroachDB real, ejercitando
- *     el mismo repositorio que usa TicketService en produccion.
- *  2) Una prueba empirica de que el cluster aplica de verdad aislamiento
- *     SERIALIZABLE: dos transacciones concurrentes que leen y luego escriben la
- *     MISMA fila deben producir un error de conflicto de escritura (SQLSTATE
- *     40001) en al menos una de las dos -- el mismo tipo de error
- *     (WriteTooOldError / TransactionRetryError) que ya se observo en vivo en
- *     report-service (ver ReportEventListener.applyWithRetry) y que
- *     TicketService.saveWithRetry esta preparado para reintentar.
+ *  1) Un roundtrip save/findByTicketId contra el CockroachDB real, a traves del puerto.
+ *  2) Una prueba empirica de que el cluster aplica de verdad aislamiento SERIALIZABLE: dos
+ *     transacciones concurrentes que leen y luego escriben la MISMA fila deben producir un
+ *     error de conflicto de escritura (SQLSTATE 40001) en al menos una de las dos.
  */
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import({TicketRepositoryAdapter.class, TicketMapper.class})
 class TicketRepositoryIntegrationTest {
 
     @Container
@@ -74,7 +80,7 @@ class TicketRepositoryIntegrationTest {
             """,
             // Mismo esquema que db-cluster/scripts/init_db.sql: PK (created_at, id)
             // particionada por rango de fecha (ver ADR-0003) + indice unico sobre
-            // id para el punto de acceso real (TicketRepository.findByTicketId).
+            // id para el punto de acceso real (findByTicketId).
             """
             CREATE TABLE IF NOT EXISTS tickets (
                 created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),

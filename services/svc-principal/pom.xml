@@ -123,4 +123,37 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Cobertura de pruebas unitarias (Modulo A, salida esperada: "sube a >= 70%").
+             En un perfil aparte (no activo por defecto) para que "mvn test" normal siga
+             funcionando sin conexion a internet. Correr "mvn test -Pcoverage" para generar
+             el reporte en target/site/jacoco/index.html (usado por el pipeline de CI/CD). -->
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <version>0.8.11</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>prepare-agent</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>report</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>report</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

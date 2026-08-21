@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Insignia blanca (simboliza un ticket resuelto) dentro de la zona segura del icono adaptativo. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M29,54 a25,25 0,1,0 50,0 a25,25 0,1,0 -50,0 z" />
+    <!-- Check navy, mismo color de marca que el fondo. -->
+    <path
+        android:strokeColor="#1E3A5F"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M42,55 L50,63 L68,43" />
+</vector>

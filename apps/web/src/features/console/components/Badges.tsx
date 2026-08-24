@@ -72,6 +72,29 @@ export function UnassignedChip({ label }: { label: string }) {
   )
 }
 
+// Para CLIENTE (ver ConsolePage.tsx): antes se mostraba el UUID crudo del tecnico
+// (ej. "87427661") cuando no habia nombre resuelto -- un cliente no tiene forma de
+// interpretar ese id ni le aporta nada saber cual tecnico especifico le toco, asi
+// que se reemplaza por un chip generico "Asignado", simetrico a UnassignedChip.
+export function AssignedChip({ label }: { label: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        background: 'var(--status-resuelto)',
+        color: '#fff',
+        borderRadius: 999,
+        padding: '2px 10px',
+        fontSize: '0.8rem',
+        fontWeight: 700,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
 export function SlaBadge({ breached }: { breached: boolean }) {
   const { t } = useTranslation()
   if (!breached) {

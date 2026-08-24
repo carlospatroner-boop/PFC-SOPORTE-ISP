@@ -16,6 +16,7 @@ const mockTickets: TicketResponse[] = [
     description: 'Sin acceso a Internet',
     createdAt: '2026-01-01T00:00:00Z',
     slaDeadline: null,
+    resolvedAt: null,
     slaBreached: false,
   },
   {
@@ -29,6 +30,7 @@ const mockTickets: TicketResponse[] = [
     description: 'Router lento',
     createdAt: '2026-01-02T00:00:00Z',
     slaDeadline: null,
+    resolvedAt: null,
     slaBreached: true,
   },
 ]

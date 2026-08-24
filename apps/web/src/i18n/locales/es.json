@@ -28,13 +28,17 @@
   "console": {
     "title": "Consola de operadores",
     "subtitle": "Vista de SLA por zona y por técnico",
-    "search": "Buscar por descripción…",
+    "titleCliente": "Mis solicitudes de soporte",
+    "subtitleCliente": "Consulta el estado de tus tickets",
+    "search": "Buscar por descripción o ID…",
     "filterZone": "Zona",
     "filterStatus": "Estado",
     "filterAll": "Todas",
     "newTicket": "Nueva solicitud",
+    "assigned": "Asignado",
     "kpi": {
       "total": "Tickets totales",
+      "totalCliente": "Tus tickets",
       "escalated": "Escalados",
       "breached": "SLA vencido"
     },
@@ -69,7 +73,22 @@
     "slaOk": "OK",
     "unassigned": "Sin asignar",
     "empty": "No hay tickets con estos filtros",
-    "error": "No se pudieron cargar los tickets"
+    "error": "No se pudieron cargar los tickets",
+    "detail": {
+      "title": "Detalle del ticket",
+      "openHint": "Clic para ver el detalle completo",
+      "close": "Cerrar",
+      "zone": "Zona",
+      "technician": "Técnico",
+      "category": "Categoría",
+      "clientId": "ID de cliente",
+      "description": "Descripción",
+      "timeline": "Cronología",
+      "createdAt": "Creado",
+      "slaDeadline": "Vencimiento de SLA",
+      "resolvedAt": "Resuelto",
+      "error": "No se pudo cargar el detalle del ticket"
+    }
   },
   "admin": {
     "title": "Administración",

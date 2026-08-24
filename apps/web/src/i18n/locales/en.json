@@ -28,13 +28,17 @@
   "console": {
     "title": "Operator console",
     "subtitle": "SLA view by zone and by technician",
-    "search": "Search by description…",
+    "titleCliente": "My support requests",
+    "subtitleCliente": "Check the status of your tickets",
+    "search": "Search by description or ID…",
     "filterZone": "Zone",
     "filterStatus": "Status",
     "filterAll": "All",
     "newTicket": "New request",
+    "assigned": "Assigned",
     "kpi": {
       "total": "Total tickets",
+      "totalCliente": "Your tickets",
       "escalated": "Escalated",
       "breached": "SLA breached"
     },
@@ -69,7 +73,22 @@
     "slaOk": "OK",
     "unassigned": "Unassigned",
     "empty": "No tickets match these filters",
-    "error": "Could not load tickets"
+    "error": "Could not load tickets",
+    "detail": {
+      "title": "Ticket detail",
+      "openHint": "Click to see the full detail",
+      "close": "Close",
+      "zone": "Zone",
+      "technician": "Technician",
+      "category": "Category",
+      "clientId": "Client ID",
+      "description": "Description",
+      "timeline": "Timeline",
+      "createdAt": "Created",
+      "slaDeadline": "SLA deadline",
+      "resolvedAt": "Resolved",
+      "error": "Could not load the ticket detail"
+    }
   },
   "admin": {
     "title": "Admin",

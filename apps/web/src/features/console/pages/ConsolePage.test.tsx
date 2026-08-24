@@ -20,6 +20,7 @@ const mockTickets: TicketResponse[] = [
     description: 'Sin acceso a Internet',
     createdAt: '2026-01-01T00:00:00Z',
     slaDeadline: null,
+    resolvedAt: null,
     slaBreached: true,
   },
 ]
@@ -61,7 +62,7 @@ describe('ConsolePage', () => {
     renderAsRole('ADMIN')
     await screen.findByText('Sin acceso a Internet')
 
-    fireEvent.change(screen.getByPlaceholderText('Buscar por descripción…'), {
+    fireEvent.change(screen.getByPlaceholderText('Buscar por descripción o ID…'), {
       target: { value: 'texto que no existe en ningun ticket' },
     })
 

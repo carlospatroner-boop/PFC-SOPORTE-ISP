@@ -21,5 +21,6 @@ export interface TicketResponse {
   description: string
   createdAt: string
   slaDeadline: string | null
+  resolvedAt: string | null
   slaBreached: boolean
 }

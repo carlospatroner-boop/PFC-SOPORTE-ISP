@@ -41,8 +41,14 @@ export function useTickets(): UseTicketsResult {
 
   const tickets = useMemo(() => {
     return allTickets.filter((ticket) => {
+      // Busca tambien por ticketId (no solo descripcion) -- util para verificar en la
+      // consola web que una accion hecha desde otro cliente (ej. la app movil) se propago
+      // al mismo backend real: se copia el id mostrado alla y se pega aqui.
+      const query = search.trim().toLowerCase()
       const matchesSearch =
-        search.trim().length === 0 || ticket.description.toLowerCase().includes(search.toLowerCase())
+        query.length === 0 ||
+        ticket.description.toLowerCase().includes(query) ||
+        ticket.ticketId.toLowerCase().includes(query)
       const matchesZone = zoneFilter === null || ticket.zone === zoneFilter
       const matchesStatus = statusFilter === null || ticket.status === statusFilter
       return matchesSearch && matchesZone && matchesStatus

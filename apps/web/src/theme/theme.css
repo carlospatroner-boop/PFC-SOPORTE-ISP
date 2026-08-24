@@ -96,6 +96,12 @@ a {
 .data-table tbody tr:hover {
   background: rgba(15, 107, 92, 0.08);
 }
+/* Filas clickeables (ver ConsolePage.tsx: abren el detalle completo del ticket) --
+   el cursor es la unica pista de que la fila hace algo, ya que "Acciones" (con
+   stopPropagation) convive en la misma fila y no debe verse afectada. */
+.data-table tbody tr[data-clickable="true"] {
+  cursor: pointer;
+}
 .data-table tbody td {
   border-bottom: 1px solid var(--border);
 }

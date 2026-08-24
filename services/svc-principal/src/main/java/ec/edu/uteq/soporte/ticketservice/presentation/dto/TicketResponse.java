@@ -20,13 +20,14 @@ public record TicketResponse(
         String description,
         OffsetDateTime createdAt,
         OffsetDateTime slaDeadline,
+        OffsetDateTime resolvedAt,
         boolean slaBreached
 ) {
     public static TicketResponse from(Ticket t) {
         return new TicketResponse(
                 t.getZone(), t.getId(), t.getClientId(), t.getTechnicianId(),
                 t.getCategory(), t.getPriority(), t.getStatus(), t.getDescription(),
-                t.getCreatedAt(), t.getSlaDeadline(), t.isSlaBreached()
+                t.getCreatedAt(), t.getSlaDeadline(), t.getResolvedAt(), t.isSlaBreached()
         );
     }
 }

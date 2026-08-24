@@ -4,8 +4,9 @@ import { useAuth } from '../../auth/hooks/useAuth'
 import { getUserId } from '../../auth/session'
 import { useTickets } from '../hooks/useTickets'
 import { useTechnicians } from '../hooks/useTechnicians'
-import { PriorityBadge, SlaBadge, StatusBadge, UnassignedChip } from '../components/Badges'
+import { AssignedChip, PriorityBadge, SlaBadge, StatusBadge, UnassignedChip } from '../components/Badges'
 import { CreateTicketModal } from '../components/CreateTicketModal'
+import { TicketDetailModal } from '../components/TicketDetailModal'
 import { TicketRowActions } from '../components/TicketRowActions'
 import type { TicketStatus, Zone } from '../types/ticket'
 
@@ -35,6 +36,7 @@ export function ConsolePage() {
   )
 
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [detailTicketId, setDetailTicketId] = useState<string | null>(null)
 
   const {
     tickets,
@@ -58,8 +60,13 @@ export function ConsolePage() {
     <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <div>
-          <h1 style={{ marginBottom: 4 }}>{t('console.title')}</h1>
-          <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>{t('console.subtitle')}</p>
+          {/* CLIENTE tiene su propio titulo/subtitulo: "Consola de operadores" y
+              "Vista de SLA por zona y por tecnico" es jerga interna del equipo, no algo
+              que un cliente final deba leer en su propia pantalla. */}
+          <h1 style={{ marginBottom: 4 }}>{t(isCliente ? 'console.titleCliente' : 'console.title')}</h1>
+          <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>
+            {t(isCliente ? 'console.subtitleCliente' : 'console.subtitle')}
+          </p>
         </div>
         {isCliente && (
           <button type="button" onClick={() => setShowCreateModal(true)} style={createButtonStyle}>
@@ -69,7 +76,11 @@ export function ConsolePage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, margin: '8px 0 20px' }}>
-        <StatCard label={t('console.kpi.total')} value={allCount} color="var(--color-navy)" />
+        <StatCard
+          label={t(isCliente ? 'console.kpi.totalCliente' : 'console.kpi.total')}
+          value={allCount}
+          color="var(--color-navy)"
+        />
         <StatCard label={t('console.kpi.escalated')} value={escaladoCount} color="var(--status-escalado)" />
         <StatCard label={t('console.kpi.breached')} value={breachedCount} color="var(--color-amber)" />
       </div>
@@ -155,11 +166,23 @@ export function ConsolePage() {
               )}
               {!loading &&
                 tickets.map((ticket) => (
-                  <tr key={ticket.ticketId}>
+                  <tr
+                    key={ticket.ticketId}
+                    onClick={() => setDetailTicketId(ticket.ticketId)}
+                    data-clickable="true"
+                    title={t('console.detail.openHint') ?? ''}
+                  >
                     <td style={tdStyle}>{ticket.zone}</td>
                     <td style={tdStyle}>
                       {ticket.technicianId ? (
-                        (technicianNameById[ticket.technicianId] ?? ticket.technicianId.slice(0, 8))
+                        isCliente ? (
+                          // Un cliente no tiene forma de interpretar un UUID interno ni le
+                          // aporta saber cual tecnico especifico le toco -- solo si ya tiene
+                          // uno asignado o no (ver AssignedChip en Badges.tsx).
+                          <AssignedChip label={t('console.assigned')} />
+                        ) : (
+                          (technicianNameById[ticket.technicianId] ?? ticket.technicianId.slice(0, 8))
+                        )
                       ) : (
                         <UnassignedChip label={t('console.unassigned')} />
                       )}
@@ -173,7 +196,11 @@ export function ConsolePage() {
                     </td>
                     <td style={{ ...tdStyle, maxWidth: 360 }}>{ticket.description}</td>
                     {canManage && (
-                      <td style={tdStyle}>
+                      // stopPropagation: sin esto, cualquier clic en el selector de estado o
+                      // en "Asignarme" tambien abriria el modal de detalle por encima del
+                      // dropdown nativo -- la fila entera es clickeable (ver onClick arriba),
+                      // pero esta celda especificamente no debe disparar esa navegacion.
+                      <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
                         <TicketRowActions
                           ticket={ticket}
                           currentUserId={userId}
@@ -197,6 +224,19 @@ export function ConsolePage() {
             setShowCreateModal(false)
             refresh()
           }}
+        />
+      )}
+
+      {detailTicketId && (
+        <TicketDetailModal
+          ticketId={detailTicketId}
+          technicianName={
+            (() => {
+              const t = tickets.find((x) => x.ticketId === detailTicketId)
+              return t?.technicianId ? (technicianNameById[t.technicianId] ?? null) : null
+            })()
+          }
+          onClose={() => setDetailTicketId(null)}
         />
       )}
     </div>

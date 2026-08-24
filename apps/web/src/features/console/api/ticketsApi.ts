@@ -15,6 +15,14 @@ export async function listTickets(): Promise<TicketResponse[]> {
   return response.data.data
 }
 
+// Detalle completo de un ticket puntual (ver TicketController.getTicket) -- la autorizacion
+// (CLIENTE solo el suyo, TECNICO solo su zona, ADMIN cualquiera) la resuelve el backend via
+// TicketAuthorization.assertCanView, igual que en listTickets.
+export async function getTicket(ticketId: string): Promise<TicketResponse> {
+  const response = await ticketsClient.get<ApiEnvelope<TicketResponse>>(`api/v1/tickets/${ticketId}`)
+  return response.data.data
+}
+
 export interface CreateTicketPayload {
   zone: Zone
   title: string

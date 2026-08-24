@@ -1,0 +1,5 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,/api/v1/auth/login,HTTPError('500 Server Error: Internal Server Error for url: /api/v1/auth/login'),16,2026-08-24T13:51:35Z,2026-08-24T13:51:37Z
+GET,"/api/v1/tickets [GET admin, sin filtro]","HTTPError('500 Server Error: Internal Server Error for url: /api/v1/tickets [GET admin, sin filtro]')",23,2026-08-24T13:51:41Z,2026-08-24T13:52:31Z
+GET,/api/v1/tickets [GET lista],HTTPError('500 Server Error: Internal Server Error for url: /api/v1/tickets [GET lista]'),26,2026-08-24T13:51:37Z,2026-08-24T13:52:33Z
+POST,/api/v1/tickets [POST crear],HTTPError('500 Server Error: Internal Server Error for url: /api/v1/tickets [POST crear]'),3,2026-08-24T13:51:41Z,2026-08-24T13:51:58Z

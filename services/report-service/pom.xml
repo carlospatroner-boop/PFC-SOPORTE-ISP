@@ -34,6 +34,21 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Expone /actuator/prometheus con http_requests_total y http_request_duration_seconds
+             (ver metrics/HttpMetricsFilter.java): metricas exigidas por el Modulo F de la
+             Guia de Entrega 4. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Logs en JSON estructurado (Modulo F, item 4). trace_id lo agrega el agente
+             Java de OpenTelemetry (ver Dockerfile) en el MDC de Logback. -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
 
         <!-- CockroachDB habla el protocolo de PostgreSQL: se usa el driver de postgresql -->
         <dependency>

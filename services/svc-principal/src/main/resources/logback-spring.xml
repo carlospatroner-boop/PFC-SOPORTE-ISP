@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logs en JSON estructurado con trace_id/span_id (Modulo F, item 4 de la Guia de Entrega 4).
+  El agente Java de OpenTelemetry (adjuntado en el Dockerfile via JAVA_TOOL_OPTIONS) escribe
+  trace_id/span_id en el MDC de Logback en cada request instrumentado: esta configuracion
+  solo necesita leerlos con %X{trace_id}/%X{span_id}; si una linea de log no ocurre dentro de
+  una traza activa (ej. al arrancar el servicio), esos campos simplemente salen vacios.
+-->
+<configuration>
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>trace_id</includeMdcKeyName>
+            <includeMdcKeyName>span_id</includeMdcKeyName>
+            <customFields>{"service":"ticket-service"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="JSON" />
+    </root>
+
+    <logger name="ec.edu.uteq.soporte" level="INFO" />
+    <logger name="org.hibernate.SQL" level="DEBUG" />
+</configuration>

@@ -1,0 +1,33 @@
+# Tempo -- backend de trazas distribuidas de Grafana. Recibe via OTLP desde el
+# otel-collector y las deja disponibles como datasource de Grafana (ver
+# ops/grafana/provisioning/datasources/) para poder responder la pregunta obligatoria de
+# la defensa: "muestre una traza distribuida completa desde la app movil hasta el
+# cluster CRDB y describa cada span" (Anexo B, pregunta 3).
+
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  trace_idle_period: 10s
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 48h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal

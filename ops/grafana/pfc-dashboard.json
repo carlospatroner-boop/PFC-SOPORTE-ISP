@@ -1,0 +1,96 @@
+{
+  "id": null,
+  "uid": "pfc-soporte-isp",
+  "title": "PFC Soporte ISP — Observabilidad (Entrega 4)",
+  "description": "Dashboard operativo del equipo ACC. Los 6 paneles obligatorios del Modulo F de la Guia de Entrega 4: tasa de peticiones, latencia p50/p95/p99, tasa de errores 5xx, disponibilidad Raft del cluster CockroachDB, uso de recursos por contenedor, y latencia end-to-end observada en el API Gateway (punto de entrada unico de web y movil).",
+  "tags": ["pfc", "soporte-isp", "acc"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "1. Tasa de peticiones (por servicio y ruta)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[1m])) by (job, route)",
+          "legendFormat": "{{job}} {{route}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "2. Latencia p50 / p95 / p99",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        { "expr": "avg(http_request_duration_seconds{quantile=\"0.5\"}) by (job)", "legendFormat": "p50 {{job}}" },
+        { "expr": "avg(http_request_duration_seconds{quantile=\"0.95\"}) by (job)", "legendFormat": "p95 {{job}}" },
+        { "expr": "avg(http_request_duration_seconds{quantile=\"0.99\"}) by (job)", "legendFormat": "p99 {{job}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "3. Tasa de errores 5xx",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[1m])) by (job) / sum(rate(http_requests_total[1m])) by (job)",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "4. Disponibilidad Raft del cluster CockroachDB",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "description": "liveness_livenodes: nodos vivos (esperado 3). ranges_unavailable: rangos sin mayoria Raft disponible (esperado 0 en operacion normal; ver Evidencia 2 del EV-AUT-03 de Carpio para el experimento de caida de nodos).",
+      "targets": [
+        { "expr": "liveness_livenodes", "legendFormat": "nodos vivos ({{instance}})" },
+        { "expr": "ranges_unavailable", "legendFormat": "rangos sin quorum ({{instance}})" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "5. Uso de recursos por contenedor (CPU / memoria)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"auth-service|ticket-service|report-service|api-gateway|web|roach1|roach2|roach3\"}[1m])) by (name)",
+          "legendFormat": "CPU {{name}}"
+        },
+        {
+          "expr": "sum(container_memory_usage_bytes{name=~\"auth-service|ticket-service|report-service|api-gateway|web|roach1|roach2|roach3\"}) by (name)",
+          "legendFormat": "Mem {{name}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "6. Latencia end-to-end (API Gateway, entrada unica de web y movil)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "description": "Latencia observada en el API Gateway -- el unico punto de entrada real tanto de apps/web como de apps/mobile (10.0.2.2:8000 desde el emulador), asi que es la mejor aproximacion servidor-side a la latencia end-to-end del cliente movil sin instrumentar un SDK de OpenTelemetry dentro de la app Android (fuera del alcance de esta entrega).",
+      "targets": [
+        { "expr": "avg(http_request_duration_seconds{job=\"api-gateway\", quantile=\"0.95\"})", "legendFormat": "p95 gateway" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    }
+  ]
+}

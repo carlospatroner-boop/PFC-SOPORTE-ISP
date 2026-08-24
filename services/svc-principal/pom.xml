@@ -47,6 +47,15 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
+        <!-- Logs en JSON estructurado (Modulo F, item 4). El campo trace_id lo agrega el
+             agente Java de OpenTelemetry (ver Dockerfile) escribiendolo en el MDC de
+             Logback: logback-spring.xml solo necesita leerlo con %X{trace_id}. -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
         <!-- @Aspect para medir la duracion de cada consulta a TicketRepository sin
              tener que instrumentar cada metodo a mano (ver config/RepositoryTimingAspect.java) -->
         <dependency>
@@ -90,6 +99,19 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Verificacion del lado PROVEEDOR del contrato Pact (Modulo D de la Guia de
+             Entrega 4). Lee el archivo generado por el consumidor (apps/web, ver
+             apps/web/tests/contract/ticketsApi.pact.test.ts -> pacts/soporte-web-ticket-service.json)
+             y repite cada interaccion contra el ticket-service real. Ver
+             contract/TicketServiceProviderPactTest.java para como se activa (no corre en
+             un "mvn test" normal porque necesita el stack completo levantado). -->
+        <dependency>
+            <groupId>au.com.dius.pact.provider</groupId>
+            <artifactId>junit5</artifactId>
+            <version>4.7.5</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

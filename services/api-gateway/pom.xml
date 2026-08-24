@@ -35,6 +35,21 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Expone /actuator/prometheus (ya incluido en la exposicion de application.yml) con
+             http_requests_total y http_request_duration_seconds del propio gateway, ver
+             infrastructure/metrics/HttpMetricsGlobalFilter.java. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Logs en JSON estructurado (Modulo F, item 4), trace_id agregado por el agente
+             Java de OpenTelemetry (ver Dockerfile) en el MDC de Logback. -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

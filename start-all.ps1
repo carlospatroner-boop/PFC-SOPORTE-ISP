@@ -151,11 +151,21 @@ Start-Process -FilePath $mvnCmd -ArgumentList "spring-boot:run" `
     -WindowStyle Hidden
 Wait-Health "http://localhost:8000/actuator/health" "api-gateway" | Out-Null
 
-Write-Host "`n=== 9/9: Frontend ===" -ForegroundColor Cyan
-Set-Location "$root\frontend"
-Start-Process -FilePath "python" -ArgumentList "-m", "http.server", "5500" -WindowStyle Hidden
-Start-Sleep -Seconds 2
-Write-Host "  -> Frontend servido" -ForegroundColor Green
+Write-Host "`n=== 9/9: Frontend (apps/web -- React, Entrega 4) ===" -ForegroundColor Cyan
+# El frontend viejo (frontend/, HTML plano de E2/E3) se reemplazo por apps/web
+# (Vite + React) en la Entrega 4: consola por rol, panel Admin/Reportes, login
+# rediseñado. apps/web/src/lib/apiClient.ts ya apunta por defecto al API Gateway
+# (localhost:8000), asi que no hace falta ningun .env para desarrollo local.
+Set-Location "$root\apps\web"
+if (-not (Test-Path "node_modules")) {
+    Write-Host "  Instalando dependencias (primera vez)..."
+    npm install --quiet
+}
+Start-Process -FilePath "npm.cmd" -ArgumentList "run", "dev" `
+    -RedirectStandardOutput "$env:TEMP\apps-web.out.log" -RedirectStandardError "$env:TEMP\apps-web.err.log" `
+    -WindowStyle Hidden
+Start-Sleep -Seconds 3
+Write-Host "  -> Frontend (apps/web) servido en http://localhost:5173" -ForegroundColor Green
 
 Write-Host "`n=== Creando cuentas de prueba (si no existen ya) ===" -ForegroundColor Cyan
 try {
@@ -171,7 +181,7 @@ Set-Location $root
 Write-Host "`n================================================================" -ForegroundColor Yellow
 Write-Host " TODO LISTO" -ForegroundColor Yellow
 Write-Host "================================================================" -ForegroundColor Yellow
-Write-Host " Abre en el navegador: http://localhost:5500/auth/index.html"
+Write-Host " Abre en el navegador: http://localhost:5173"
 Write-Host ""
 Write-Host " Cuentas de prueba:"
 Write-Host "   ADMIN:   admin@soporte.local / Admin123!"

@@ -171,7 +171,19 @@ fun TicketDetailScreen(ticketId: String, onBack: () -> Unit, onClosed: () -> Uni
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
-            
+
+            // ID completo y seleccionable: sirve para verificar en la consola web que el
+            // cierre hecho aqui (movil) se propago al mismo backend real -- buscar este id
+            // en apps/web tras presionar "FINALIZAR TICKET".
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(
+                    text = "ID: ${ticket.ticketId}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+
             Surface(
                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
                 shape = RoundedCornerShape(8.dp),

@@ -27,6 +27,10 @@ spark/data/processed/
 spark/results/*.png
 spark/results/*.csv
 
+# Playwright (apps/web/e2e) -- reporte HTML y trazas de cada corrida, se regeneran solos
+apps/web/playwright-report/
+apps/web/test-results/
+
 # Docker
 db-cluster/*-data/
 

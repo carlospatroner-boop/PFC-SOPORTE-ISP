@@ -41,10 +41,17 @@ jobs:
         working-directory: apps/web
         run: npm run lint
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: apps/mobile - permiso de ejecucion de gradlew
+        # gradlew se committeo desde Windows, donde no existe el bit ejecutable de Unix --
+        # git lo guarda sin permiso de ejecucion y el runner de Actions (Linux) lo rechaza
+        # con "exit code 126: Permission denied". No depende de que alguien lo arregle en
+        # el repo: se fuerza aqui mismo antes de invocarlo.
+        run: chmod +x apps/mobile/gradlew
 
       - name: apps/mobile - android lint
         working-directory: apps/mobile
@@ -63,7 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -139,10 +146,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: apps/mobile - permiso de ejecucion de gradlew
+        run: chmod +x apps/mobile/gradlew
 
       - name: Pruebas unitarias de ViewModel (JVM)
         working-directory: apps/mobile
@@ -193,6 +203,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Nombre del repositorio en minusculas
+        # Docker exige que el nombre del repositorio de una imagen sea todo minusculas
+        # ("repository name must be lowercase") -- github.repository trae el nombre real
+        # del repo (ej. carlospatroner-boop/PFC-SOPORTE-ISP), que puede tener mayusculas.
+        run: echo "REPO_LC=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -204,8 +220,8 @@ jobs:
           context: ${{ matrix.context }}
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.name }}:latest
+            ${{ env.REGISTRY }}/${{ env.REPO_LC }}/${{ matrix.name }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.REPO_LC }}/${{ matrix.name }}:latest
 
   # ============================================================
   # 6. build-mobile-apk: compila el APK debug y lo deja como artefacto descargable del run
@@ -217,10 +233,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: apps/mobile - permiso de ejecucion de gradlew
+        run: chmod +x apps/mobile/gradlew
 
       - name: Compilar APK debug
         working-directory: apps/mobile
@@ -251,17 +270,26 @@ jobs:
         run: docker compose up -d --build
 
       - name: Esperar a que auth-service y ticket-service esten healthy
+        # 40 intentos x 15s = 10 minutos: un runner compartido de GitHub (2 CPU) construye
+        # y arranca 17 contenedores desde cero (sin cache de capas), notablemente mas lento
+        # que una maquina de desarrollo con las imagenes ya construidas -- el primer intento
+        # de este job en produccion fallo con un timeout de solo 5 minutos.
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 40); do
             AUTH=$(docker inspect --format='{{.State.Health.Status}}' auth-service 2>/dev/null || echo "starting")
             TICKET=$(docker inspect --format='{{.State.Health.Status}}' ticket-service 2>/dev/null || echo "starting")
             echo "intento $i: auth-service=$AUTH ticket-service=$TICKET"
             if [ "$AUTH" = "healthy" ] && [ "$TICKET" = "healthy" ]; then exit 0; fi
-            sleep 5
+            sleep 15
           done
-          echo "El stack no quedo healthy a tiempo"; docker compose logs --tail 100; exit 1
+          echo "El stack no quedo healthy a tiempo -- estado de todos los contenedores:"
+          docker compose ps
+          echo "--- logs de auth-service ---"; docker compose logs --tail 200 auth-service
+          echo "--- logs de ticket-service ---"; docker compose logs --tail 200 ticket-service
+          echo "--- logs de roach1 ---"; docker compose logs --tail 100 roach1
+          exit 1
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"

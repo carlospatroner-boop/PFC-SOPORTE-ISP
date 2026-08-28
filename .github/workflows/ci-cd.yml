@@ -46,12 +46,16 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: apps/mobile - permiso de ejecucion de gradlew
-        # gradlew se committeo desde Windows, donde no existe el bit ejecutable de Unix --
-        # git lo guarda sin permiso de ejecucion y el runner de Actions (Linux) lo rechaza
-        # con "exit code 126: Permission denied". No depende de que alguien lo arregle en
-        # el repo: se fuerza aqui mismo antes de invocarlo.
-        run: chmod +x apps/mobile/gradlew
+      - name: apps/mobile - normalizar y habilitar gradlew
+        # gradlew se committeo desde Windows con 2 problemas: (1) sin el bit ejecutable de
+        # Unix -- "exit code 126: Permission denied" -- y (2) con terminadores de linea CRLF,
+        # que corrompen el script de shell de forma sutil (el interprete termina confundiendo
+        # sus propios argumentos de memoria, ej. "-Xmx64m", con el nombre de una clase a
+        # ejecutar -- "Could not find or load main class ""-Xmx64m""). Se corrigen los dos
+        # aqui mismo, sin depender de que alguien los arregle en el repo.
+        run: |
+          sed -i 's/\r$//' apps/mobile/gradlew
+          chmod +x apps/mobile/gradlew
 
       - name: apps/mobile - android lint
         working-directory: apps/mobile
@@ -151,8 +155,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: apps/mobile - permiso de ejecucion de gradlew
-        run: chmod +x apps/mobile/gradlew
+      - name: apps/mobile - normalizar y habilitar gradlew
+        run: |
+          sed -i 's/\r$//' apps/mobile/gradlew
+          chmod +x apps/mobile/gradlew
 
       - name: Pruebas unitarias de ViewModel (JVM)
         working-directory: apps/mobile
@@ -183,6 +189,12 @@ jobs:
     needs: [test-backend, test-web]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # Sin esto, GITHUB_TOKEN no puede CREAR un paquete nuevo en GHCR la primera vez que
+      # se publica cada imagen ("denied: installation not allowed to Create organization
+      # package") -- el permiso por defecto del token para "packages" es de solo lectura.
     strategy:
       matrix:
         include:
@@ -238,8 +250,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: apps/mobile - permiso de ejecucion de gradlew
-        run: chmod +x apps/mobile/gradlew
+      - name: apps/mobile - normalizar y habilitar gradlew
+        run: |
+          sed -i 's/\r$//' apps/mobile/gradlew
+          chmod +x apps/mobile/gradlew
 
       - name: Compilar APK debug
         working-directory: apps/mobile

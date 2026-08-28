@@ -25,12 +25,15 @@
 #   abrir http://localhost:3000                  (grafana, admin/admin la primera vez)
 
 networks:
-  # Reusa la red creada originalmente por db-cluster/docker-compose.cockroach.yml (mismo
-  # nombre) en vez de intentar crear una nueva -- evita la advertencia de Docker Compose
-  # de "network exists but was not created for this project".
+  # NO marcar como "external: true": eso asume que la red ya existe de antemano (cierto en
+  # una maquina de desarrollo que la creo con los compose files sueltos de antes de unificar
+  # todo en este archivo), pero en una maquina limpia -- como un runner de GitHub Actions --
+  # esa red nunca existio, y "external: true" hace que "docker compose up" falle de inmediato
+  # con "network soporte-net declared as external, but could not be found" (encontrado
+  # corriendo el job "integration" del pipeline real). Sin "external", Compose crea la red si
+  # no existe y reutiliza la existente si ya esta -- funciona en los dos casos.
   soporte-net:
     name: soporte-net
-    external: true
 
 volumes:
   # Apuntados por nombre explicito a los volumenes que ya existian desde

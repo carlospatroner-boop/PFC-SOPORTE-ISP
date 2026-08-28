@@ -10,6 +10,7 @@ const express = require("express");
 const config = require("./config");
 const { startConsumer } = require("./kafkaConsumer");
 const notificationsRouter = require("./routes/notifications");
+const logger = require("./logger");
 
 const app = express();
 
@@ -20,9 +21,9 @@ app.get("/health", (req, res) => {
 app.use("/api/v1/notifications", notificationsRouter);
 
 app.listen(config.port, () => {
-  console.log(`notification-service arriba en el puerto ${config.port}`);
+  logger.info("notification-service arriba", { port: config.port });
 });
 
 startConsumer().catch((err) => {
-  console.error("No se pudo iniciar el consumidor de Kafka:", err);
+  logger.error("No se pudo iniciar el consumidor de Kafka", { error: err.message, stack: err.stack });
 });

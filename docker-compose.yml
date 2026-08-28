@@ -71,7 +71,14 @@ services:
     networks: [soporte-net]
     mem_limit: 1024m
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      # "?ready=1" exige que el nodo ya pertenezca a un cluster INICIALIZADO -- en un
+      # volumen limpio (cualquier runner de CI) eso nunca ocurre, porque quien inicializa
+      # el cluster es "db-init", y "db-init" espera a que este healthcheck pase primero
+      # (candado circular). En una maquina de desarrollo "funcionaba" solo porque el
+      # volumen ya traia un cluster inicializado de sesiones previas. Se usa "/health"
+      # a secas (liveness: el proceso esta arriba), no readiness -- suficiente para que
+      # "db-init" pueda conectarse y ejecutar "cockroach init".
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -90,7 +97,7 @@ services:
     networks: [soporte-net]
     mem_limit: 1024m
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -109,7 +116,7 @@ services:
     networks: [soporte-net]
     mem_limit: 1024m
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -131,7 +138,17 @@ services:
     networks: [soporte-net]
     entrypoint: ["/bin/bash", "-c"]
     command: >
-      "cockroach init --insecure --host=roach1 || true &&
+      "for i in $(seq 1 30); do
+         out=$(cockroach init --insecure --host=roach1 2>&1) && break;
+         echo \"$$out\" | grep -qi 'already been initialized' && break;
+         echo \"db-init: intento $$i de 'cockroach init' fallo, reintentando en 2s: $$out\";
+         sleep 2;
+       done &&
+       for i in $(seq 1 30); do
+         cockroach sql --insecure --host=roach1 -e 'SELECT 1;' >/dev/null 2>&1 && break;
+         echo \"db-init: el cluster aun no acepta conexiones SQL (intento $$i), reintentando en 2s\";
+         sleep 2;
+       done &&
        cockroach sql --insecure --host=roach1 -f /scripts/init_db.sql &&
        cockroach sql --insecure --host=roach1 -f /config/zones.sql &&
        cockroach sql --insecure --host=roach1 -f /scripts/init_auth_db.sql &&

@@ -281,7 +281,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Levantar el stack completo
-        run: docker compose up -d --build
+        # "docker compose up" espera de forma SINCRONA a que roach1/2/3 pasen su healthcheck
+        # (depends_on: condition: service_healthy de db-init) y falla el comando entero si no
+        # lo logran -- eso significa que nunca llegamos al paso siguiente (que sí volcaria
+        # logs), y hasta ahora solo veiamos "exit code 1" sin saber por que roach1 quedaba
+        # unhealthy. Si este comando falla, se vuelcan aqui mismo los logs reales de los 3
+        # nodos antes de fallar el job, para diagnosticar la causa real en vez de adivinar.
+        run: |
+          docker compose up -d --build || {
+            echo "FALLO 'docker compose up' -- logs de los 3 nodos de CockroachDB:"
+            docker compose logs roach1 roach2 roach3
+            exit 1
+          }
 
       - name: Esperar a que auth-service y ticket-service esten healthy
         # 40 intentos x 15s = 10 minutos: un runner compartido de GitHub (2 CPU) construye

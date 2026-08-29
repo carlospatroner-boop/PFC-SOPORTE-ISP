@@ -215,6 +215,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        # Crea un builder de Buildx nuevo y limpio para este job. Sin este paso,
+        # build-push-action usa el builder implicito del runner, que a veces arrastra
+        # cache de capas corrupta entre invocaciones y produce el error observado en
+        # el run 33264918110 (matrix notification-service):
+        # "buildx failed with: ERROR: failed to build: unknown blob"
+        uses: docker/setup-buildx-action@v3
+
       - name: Nombre del repositorio en minusculas
         # Docker exige que el nombre del repositorio de una imagen sea todo minusculas
         # ("repository name must be lowercase") -- github.repository trae el nombre real

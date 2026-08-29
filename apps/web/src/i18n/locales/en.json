@@ -1,0 +1,162 @@
+{
+  "app": {
+    "title": "ISP Support — Console"
+  },
+  "role": {
+    "ADMIN": "Administrator",
+    "TECNICO": "Technician",
+    "CLIENTE": "Client"
+  },
+  "nav": {
+    "console": "Console",
+    "admin": "Admin",
+    "reports": "Reports",
+    "settings": "Settings",
+    "about": "About",
+    "logout": "Log out"
+  },
+  "login": {
+    "brand": "ISP SUPPORT",
+    "title": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "loading": "Signing in…",
+    "errorEmpty": "Enter your email and password",
+    "errorGeneric": "Could not sign in"
+  },
+  "console": {
+    "title": "Operator console",
+    "subtitle": "SLA view by zone and by technician",
+    "titleCliente": "My support requests",
+    "subtitleCliente": "Check the status of your tickets",
+    "search": "Search by description or ID…",
+    "filterZone": "Zone",
+    "filterStatus": "Status",
+    "filterAll": "All",
+    "newTicket": "New request",
+    "assigned": "Assigned",
+    "kpi": {
+      "total": "Total tickets",
+      "totalCliente": "Your tickets",
+      "escalated": "Escalated",
+      "breached": "SLA breached"
+    },
+    "table": {
+      "zone": "Zone",
+      "technician": "Technician",
+      "status": "Status",
+      "priority": "Priority",
+      "sla": "SLA",
+      "description": "Description",
+      "actions": "Actions"
+    },
+    "actions": {
+      "assignToMe": "Assign to me",
+      "assignTo": "Assign to technician…",
+      "noTechniciansInZone": "No technicians in this zone"
+    },
+    "createModal": {
+      "title": "New support request",
+      "zone": "Zone",
+      "ticketTitle": "Title",
+      "description": "Problem description",
+      "contactPhone": "Contact phone (optional)",
+      "address": "Address (optional)",
+      "cancel": "Cancel",
+      "submit": "Create request",
+      "submitting": "Creating…",
+      "errorEmpty": "Fill in the title and description",
+      "errorGeneric": "Could not create the request"
+    },
+    "slaBreached": "Breached",
+    "slaOk": "OK",
+    "unassigned": "Unassigned",
+    "empty": "No tickets match these filters",
+    "error": "Could not load tickets",
+    "detail": {
+      "title": "Ticket detail",
+      "openHint": "Click to see the full detail",
+      "close": "Close",
+      "zone": "Zone",
+      "technician": "Technician",
+      "category": "Category",
+      "clientId": "Client ID",
+      "description": "Description",
+      "timeline": "Timeline",
+      "createdAt": "Created",
+      "slaDeadline": "SLA deadline",
+      "resolvedAt": "Resolved",
+      "error": "Could not load the ticket detail"
+    }
+  },
+  "admin": {
+    "title": "Admin",
+    "subtitle": "Create CLIENT/TECHNICIAN/ADMIN accounts (ADMIN only)",
+    "form": {
+      "title": "Create account",
+      "email": "Email",
+      "password": "Password",
+      "fullName": "Full name",
+      "role": "Role",
+      "zone": "Zone (technician)",
+      "submit": "+ Create account",
+      "submitting": "Creating…",
+      "errorEmpty": "Fill in the email, password, and name",
+      "errorGeneric": "Could not create the account",
+      "success": "Account created: {{email}}"
+    },
+    "roles": {
+      "CLIENTE": "Client",
+      "TECNICO": "Technician",
+      "ADMIN": "Admin"
+    },
+    "list": {
+      "title": "Registered accounts",
+      "loading": "Loading accounts…",
+      "error": "Could not load accounts",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "zone": "Zone"
+      }
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "CQRS read model from report-service (ADMIN only)",
+    "loading": "Loading reports…",
+    "error": "Could not load reports",
+    "total": "{{count}} tickets in total",
+    "byStatus": "Tickets by status",
+    "byZone": "Tickets by zone",
+    "byCategory": "Tickets by category"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark"
+  },
+  "about": {
+    "title": "About",
+    "body": "ISP Technical Support Ticket Management System — Capstone Project, team ACC. Distributed Applications (ISR-701), Universidad Técnica Estatal de Quevedo.",
+    "version": "Delivery 4"
+  },
+  "status": {
+    "NUEVO": "New",
+    "ASIGNADO": "Assigned",
+    "EN_PROGRESO": "In progress",
+    "ESCALADO": "Escalated",
+    "RESUELTO": "Resolved",
+    "CERRADO": "Closed"
+  },
+  "priority": {
+    "CRITICO": "Critical",
+    "ALTO": "High",
+    "MEDIO": "Medium",
+    "BAJO": "Low"
+  }
+}

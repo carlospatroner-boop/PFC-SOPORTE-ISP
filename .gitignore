@@ -8,10 +8,28 @@ __pycache__/
 .venv/
 venv/
 
+# Node -- notification-service/node_modules quedo trackeado por error antes de que
+# existiera esta regla (limpiado en la Entrega 4); se regenera con "npm install".
+node_modules/
+
+# LaTeX (docs/latex, docs/portafolio-corte2, docs/diapositivas) -- subproductos de
+# compilacion, se regeneran solos con pdflatex. Nunca versionar, solo el .tex y el .pdf final.
+*.aux
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.log
+
 # Datos generados (grandes, no van al repo)
 spark/data/processed/
 spark/results/*.png
 spark/results/*.csv
+
+# Playwright (apps/web/e2e) -- reporte HTML y trazas de cada corrida, se regeneran solos
+apps/web/playwright-report/
+apps/web/test-results/
 
 # Docker
 db-cluster/*-data/
@@ -30,3 +48,7 @@ Thumbs.db
 
 # Variables sensibles
 .env
+
+# Automatización local
+ejecutar_commits.py
+*.xlsx

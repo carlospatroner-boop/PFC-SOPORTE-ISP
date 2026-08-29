@@ -13,6 +13,11 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Agente Java de OpenTelemetry (Modulo F) -- ver el comentario completo en el
+# Dockerfile de svc-principal.
+RUN wget -q -O /app/otel-agent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
 USER appuser
 
 COPY --from=builder /app/target/auth-service.jar app.jar
@@ -20,8 +25,12 @@ COPY --from=builder /app/target/auth-service.jar app.jar
 EXPOSE 8001
 
 ENV JAVA_OPTS="-Xms256m -Xmx512m"
+ENV OTEL_METRICS_EXPORTER=none
+ENV OTEL_LOGS_EXPORTER=none
+ENV OTEL_TRACES_EXPORTER=otlp
+ENV OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:8001/actuator/health || exit 1
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java -javaagent:/app/otel-agent.jar $JAVA_OPTS -jar app.jar"]

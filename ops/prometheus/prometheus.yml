@@ -1,0 +1,48 @@
+# Prometheus -- scrapea metricas de los 3 microservicios Java instrumentados, del
+# API Gateway, del cluster CockroachDB (endpoint nativo _status/vars), del uso de
+# recursos por contenedor (cAdvisor) y de las metricas OTLP re-expuestas por el
+# collector. Ver Guia de Entrega 4, Modulo F.
+
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: "auth-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["auth-service:8001"]
+
+  - job_name: "ticket-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["ticket-service:8002"]
+
+  - job_name: "report-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["report-service:8005"]
+
+  - job_name: "api-gateway"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["api-gateway:8000"]
+
+  # CockroachDB expone sus propias metricas de consenso Raft (rango disponible,
+  # rangos infra-replicados, lider por rango) en formato Prometheus nativo --
+  # alimenta el panel "disponibilidad Raft del cluster CRDB".
+  - job_name: "cockroachdb"
+    metrics_path: /_status/vars
+    static_configs:
+      - targets: ["roach1:8080", "roach2:8080", "roach3:8080"]
+
+  # Uso de recursos por contenedor (CPU/memoria) -- panel obligatorio del Modulo F.
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # Metricas re-exportadas por el otel-collector (las que llegan via OTLP) y las
+  # metricas internas del propio collector.
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8889", "otel-collector:8888"]

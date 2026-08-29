@@ -1,0 +1,357 @@
+name: CI/CD
+
+# Pipeline de 7 jobs exigido por la rubrica de Entrega 4 (Modulo D, "pipeline con al menos
+# lint, pruebas por capa, build de imagenes y un job de integracion"). Sustituye al ci.yml
+# de Entrega 3 (que solo corria pruebas unitarias por servicio): ese trabajo ahora vive
+# adentro de test-backend, y se le agrega lint, pruebas de web/mobile, build de imagenes
+# Docker (publicadas en GHCR) y un job de integracion que levanta el stack COMPLETO
+# (docker-compose.yml de la raiz) para correr Playwright (E2E real) y la verificacion del
+# proveedor Pact contra un backend real -- no mocks -- exactamente como se verifico a mano
+# antes de escribir este archivo.
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ============================================================
+  # 1. lint
+  # ============================================================
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: apps/web - npm ci
+        working-directory: apps/web
+        run: npm ci
+
+      - name: apps/web - eslint
+        working-directory: apps/web
+        run: npm run lint
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: apps/mobile - normalizar y habilitar gradlew
+        # gradlew se committeo desde Windows con 2 problemas: (1) sin el bit ejecutable de
+        # Unix -- "exit code 126: Permission denied" -- y (2) con terminadores de linea CRLF,
+        # que corrompen el script de shell de forma sutil (el interprete termina confundiendo
+        # sus propios argumentos de memoria, ej. "-Xmx64m", con el nombre de una clase a
+        # ejecutar -- "Could not find or load main class ""-Xmx64m""). Se corrigen los dos
+        # aqui mismo, sin depender de que alguien los arregle en el repo.
+        run: |
+          sed -i 's/\r$//' apps/mobile/gradlew
+          chmod +x apps/mobile/gradlew
+
+      - name: apps/mobile - android lint
+        working-directory: apps/mobile
+        run: ./gradlew :app:lintDebug --console=plain
+
+  # ============================================================
+  # 2. test-backend: los 4 servicios Java (Maven) + notification-service (Node) +
+  #    ai-service (Python). svc-principal incluye las pruebas de integracion con
+  #    Testcontainers (CockroachDB real en Docker, ver TicketRepositoryIntegrationTest.java)
+  #    -- Docker ya viene preinstalado en ubuntu-latest, sin configuracion adicional.
+  #    El Pact provider test (TicketServiceProviderPactTest) NO corre aqui a proposito:
+  #    necesita el stack completo levantado, y eso es justo lo que hace el job "integration".
+  # ============================================================
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: auth-service - mvn test
+        working-directory: services/auth-service
+        run: mvn -B test
+
+      - name: svc-principal (ticket-service) - mvn test
+        working-directory: services/svc-principal
+        run: mvn -B test
+
+      - name: report-service - mvn test
+        working-directory: services/report-service
+        run: mvn -B test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: services/notification-service/package.json
+
+      - name: notification-service - npm test
+        working-directory: services/notification-service
+        run: |
+          npm install
+          npm test
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: ai-service - pytest
+        working-directory: services/ai-service
+        run: |
+          pip install -r requirements.txt
+          python -m pytest tests/ -v
+
+  # ============================================================
+  # 3. test-web: pruebas unitarias/de componente con Vitest (incluye el contrato Pact del
+  #    CONSUMIDOR, ver tests/contract/ticketsApi.pact.test.ts -- vitest lo recoge junto con
+  #    el resto por su nombre *.test.ts, no hace falta un paso aparte).
+  # ============================================================
+  test-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: npm ci
+        working-directory: apps/web
+        run: npm ci
+
+      - name: npm test (Vitest, incluye contrato Pact del consumidor)
+        working-directory: apps/web
+        run: npm test
+
+  # ============================================================
+  # 4. test-mobile: pruebas unitarias de ViewModel (JVM, sin emulador) + las pruebas
+  #    instrumentadas de Compose Testing (Modulo C item 6) en un emulador headless real
+  #    (reactivecircus/android-emulator-runner, estandar de la comunidad para Android en
+  #    GitHub Actions -- no hay forma de correr un instrumented test sin un dispositivo o
+  #    emulador real).
+  # ============================================================
+  test-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: apps/mobile - normalizar y habilitar gradlew
+        run: |
+          sed -i 's/\r$//' apps/mobile/gradlew
+          chmod +x apps/mobile/gradlew
+
+      - name: Pruebas unitarias de ViewModel (JVM)
+        working-directory: apps/mobile
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+
+      - name: Habilitar KVM para el emulador
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Pruebas instrumentadas (Compose Testing) en emulador headless
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_5
+          disable-animations: true
+          working-directory: apps/mobile
+          script: ./gradlew :app:connectedDebugAndroidTest --console=plain
+
+  # ============================================================
+  # 5. build-images: imagenes Docker de los 6 microservicios + apps/web, publicadas en GHCR.
+  #    Solo en push (no en pull_request, para no llenar el registry de imagenes de prueba).
+  # ============================================================
+  build-images:
+    needs: [test-backend, test-web]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # Sin esto, GITHUB_TOKEN no puede CREAR un paquete nuevo en GHCR la primera vez que
+      # se publica cada imagen ("denied: installation not allowed to Create organization
+      # package") -- el permiso por defecto del token para "packages" es de solo lectura.
+    strategy:
+      matrix:
+        include:
+          - name: auth-service
+            context: services/auth-service
+          - name: ticket-service
+            context: services/svc-principal
+          - name: report-service
+            context: services/report-service
+          - name: api-gateway
+            context: services/api-gateway
+          - name: notification-service
+            context: services/notification-service
+          - name: ai-service
+            context: services/ai-service
+          - name: web
+            context: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nombre del repositorio en minusculas
+        # Docker exige que el nombre del repositorio de una imagen sea todo minusculas
+        # ("repository name must be lowercase") -- github.repository trae el nombre real
+        # del repo (ej. carlospatroner-boop/PFC-SOPORTE-ISP), que puede tener mayusculas.
+        run: echo "REPO_LC=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO_LC }}/${{ matrix.name }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.REPO_LC }}/${{ matrix.name }}:latest
+
+  # ============================================================
+  # 6. build-mobile-apk: compila el APK debug y lo deja como artefacto descargable del run
+  #    (Modulo C: "el pipeline debe producir un APK instalable").
+  # ============================================================
+  build-mobile-apk:
+    needs: [test-mobile]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: apps/mobile - normalizar y habilitar gradlew
+        run: |
+          sed -i 's/\r$//' apps/mobile/gradlew
+          chmod +x apps/mobile/gradlew
+
+      - name: Compilar APK debug
+        working-directory: apps/mobile
+        run: ./gradlew :app:assembleDebug --console=plain
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soporte-mobile-debug-apk
+          path: apps/mobile/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+  # ============================================================
+  # 7. integration: levanta el stack COMPLETO (docker-compose.yml de la raiz: 3 nodos
+  #    CockroachDB, Kafka, Mongo, los 6 microservicios, apps/web y observabilidad) y corre
+  #    contra el ya arriba y de verdad:
+  #      - la verificacion del PROVEEDOR del contrato Pact (necesita auth-service real, ver
+  #        AuthGatewayFilter.java -- por eso no puede correr en test-backend)
+  #      - Playwright E2E (navegador real -> web -> gateway -> backend real)
+  #    Es el unico lugar donde se prueba la integracion end-to-end de verdad, no con mocks.
+  # ============================================================
+  integration:
+    needs: [test-backend, test-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Levantar el stack completo
+        # "docker compose up" espera de forma SINCRONA a que roach1/2/3 pasen su healthcheck
+        # (depends_on: condition: service_healthy de db-init) y falla el comando entero si no
+        # lo logran -- eso significa que nunca llegamos al paso siguiente (que sí volcaria
+        # logs), y hasta ahora solo veiamos "exit code 1" sin saber por que roach1 quedaba
+        # unhealthy. Si este comando falla, se vuelcan aqui mismo los logs reales de los 3
+        # nodos antes de fallar el job, para diagnosticar la causa real en vez de adivinar.
+        run: |
+          docker compose up -d --build || {
+            echo "FALLO 'docker compose up' -- logs de los 3 nodos de CockroachDB:"
+            docker compose logs roach1 roach2 roach3
+            exit 1
+          }
+
+      - name: Esperar a que auth-service y ticket-service esten healthy
+        # 40 intentos x 15s = 10 minutos: un runner compartido de GitHub (2 CPU) construye
+        # y arranca 17 contenedores desde cero (sin cache de capas), notablemente mas lento
+        # que una maquina de desarrollo con las imagenes ya construidas -- el primer intento
+        # de este job en produccion fallo con un timeout de solo 5 minutos.
+        run: |
+          for i in $(seq 1 40); do
+            AUTH=$(docker inspect --format='{{.State.Health.Status}}' auth-service 2>/dev/null || echo "starting")
+            TICKET=$(docker inspect --format='{{.State.Health.Status}}' ticket-service 2>/dev/null || echo "starting")
+            echo "intento $i: auth-service=$AUTH ticket-service=$TICKET"
+            if [ "$AUTH" = "healthy" ] && [ "$TICKET" = "healthy" ]; then exit 0; fi
+            sleep 15
+          done
+          echo "El stack no quedo healthy a tiempo -- estado de todos los contenedores:"
+          docker compose ps
+          echo "--- logs de auth-service ---"; docker compose logs --tail 200 auth-service
+          echo "--- logs de ticket-service ---"; docker compose logs --tail 200 ticket-service
+          echo "--- logs de roach1 ---"; docker compose logs --tail 100 roach1
+          exit 1
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Verificacion del PROVEEDOR del contrato Pact (contra el stack real)
+        working-directory: services/svc-principal
+        run: mvn -B -Dtest=TicketServiceProviderPactTest -DRUN_CONTRACT_VERIFICATION=true test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Playwright - instalar navegadores
+        working-directory: apps/web
+        run: |
+          npm ci
+          # playwright.config.ts define 3 proyectos (chromium/firefox/webkit -- ver
+          # comentario ahi, requisito de "Compatibilidad" de la rubrica). Instalar solo
+          # "chromium" aqui hacia que firefox/webkit fallaran con "Executable doesn't
+          # exist" apenas Chromium pasaba sus 3 pruebas. Sin argumento, install trae los
+          # 3 navegadores que la config realmente usa.
+          npx playwright install --with-deps
+
+      - name: Playwright E2E (contra el stack real levantado arriba)
+        working-directory: apps/web
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14
+
+      - name: Bajar el stack
+        if: always()
+        run: docker compose down -v

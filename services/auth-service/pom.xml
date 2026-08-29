@@ -38,6 +38,21 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Expone /actuator/prometheus con http_requests_total, http_request_duration_seconds
+             (ver metrics/HttpMetricsFilter.java) y app_active_sessions (ver metrics/SessionMetrics.java):
+             metricas exigidas por el Modulo F de la Guia de Entrega 4. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Logs en JSON estructurado (Modulo F, item 4). trace_id lo agrega el agente
+             Java de OpenTelemetry (ver Dockerfile) en el MDC de Logback. -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
@@ -67,6 +82,16 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Publica "technician.created" cuando se da de alta un usuario TECNICO, para que
+             ticket-service sincronice su propia tabla technicians (misma Saga por
+             coreografia que ya usan ticket-service/ai-service/notification-service, ver
+             ADR-0004). Antes de esto, un TECNICO creado desde el panel de Admin nunca
+             llegaba a ticket_db y no se podia asignar (violaba la FK tickets_technician_id_fkey). -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
         </dependency>
 
         <dependency>

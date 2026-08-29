@@ -26,6 +26,16 @@ spring:
         # estandar de PostgreSQL funciona para las operaciones CRUD basicas usadas aqui.
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  # Solo productor (auth-service no consume nada): publica "technician.created" para que
+  # ticket-service sincronice su tabla technicians (ver TechnicianEventPublisher). JSON
+  # plano como texto, mismo criterio que ticket-service (el consumidor es otro servicio
+  # Java con su propio Jackson, no hace falta el JsonSerializer con headers de tipo).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
 auth:
   jwt:
     # ADVERTENCIA: este secreto por defecto es solo para desarrollo local. Cualquier
@@ -46,7 +56,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: always

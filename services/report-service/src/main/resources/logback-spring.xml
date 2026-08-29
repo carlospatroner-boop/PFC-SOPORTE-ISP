@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Logs en JSON estructurado con trace_id/span_id (Modulo F, item 4). Ver el comentario
+     completo en la version de ticket-service; misma configuracion. -->
+<configuration>
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>trace_id</includeMdcKeyName>
+            <includeMdcKeyName>span_id</includeMdcKeyName>
+            <customFields>{"service":"report-service"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="JSON" />
+    </root>
+
+    <logger name="ec.edu.uteq.soporte" level="INFO" />
+    <logger name="org.hibernate.SQL" level="DEBUG" />
+</configuration>

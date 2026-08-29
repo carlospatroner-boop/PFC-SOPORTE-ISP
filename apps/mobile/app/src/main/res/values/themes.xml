@@ -1,0 +1,4 @@
+<resources>
+    <!-- Tema base de la Activity antes de que Compose tome el control (ver ui/theme/Theme.kt). -->
+    <style name="Theme.SoporteMobile" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

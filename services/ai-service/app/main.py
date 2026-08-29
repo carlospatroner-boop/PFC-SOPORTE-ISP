@@ -14,9 +14,10 @@ from fastapi import FastAPI, HTTPException
 
 from app.config import settings
 from app.kafka_consumer import start_consumer_thread
+from app.logging_config import configure_logging
 from app.mongo import get_collection
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+configure_logging()
 logger = logging.getLogger("ai-service")
 
 app = FastAPI(title="ai-service", description="Clasificacion de tickets via Kafka (equipo ACC)")

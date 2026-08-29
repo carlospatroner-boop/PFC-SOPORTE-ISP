@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Carpeta interna donde se guarda la foto de evidencia antes de subirla al backend. -->
+    <cache-path name="evidencia_fotos" path="evidencia/" />
+</paths>

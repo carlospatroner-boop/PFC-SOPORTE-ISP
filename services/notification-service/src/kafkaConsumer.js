@@ -6,6 +6,7 @@ const { Kafka } = require("kafkajs");
 const config = require("./config");
 const { dispatch } = require("./dispatcher");
 const { getCollection } = require("./db");
+const logger = require("./logger");
 
 async function handleMessage(topic, event) {
   const notifications = dispatch(topic, event);
@@ -48,12 +49,12 @@ async function startConsumer() {
         // Un mensaje malformado o un fallo puntual de Mongo no debe tumbar el consumidor --
         // se registra y se sigue con el siguiente (mismo criterio que
         // ai-service/app/kafka_consumer.py).
-        console.error(`No se pudo procesar un mensaje de ${topic}:`, err);
+        logger.error("No se pudo procesar un mensaje de Kafka", { topic, error: err.message, stack: err.stack });
       }
     },
   });
 
-  console.log(`notification-service escuchando: ${Object.values(config.topics).join(", ")}`);
+  logger.info("notification-service escuchando", { topics: Object.values(config.topics) });
   return consumer;
 }
 

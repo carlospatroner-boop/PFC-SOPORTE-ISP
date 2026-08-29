@@ -1,0 +1,54 @@
+# OpenTelemetry Collector -- punto unico donde confluyen las 3 señales de observabilidad
+# (metricas, logs, trazas) de los 3 microservicios Java instrumentados (auth-service,
+# ticket-service, report-service), antes de exportarlas a sus backends respectivos.
+# Ver Guia de Entrega 4, Modulo F.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  # Agrega el nombre del servicio como atributo de recurso si el SDK del cliente no lo
+  # mando ya (red de seguridad; los 3 servicios si lo mandan via OTEL_SERVICE_NAME).
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: pfc-local
+        action: upsert
+
+exporters:
+  # Trazas -> Tempo (via su receptor OTLP propio)
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # Metricas que llegan por OTLP (ademas de las que Prometheus scrapea directo de cada
+  # servicio en /actuator/prometheus) se re-exponen aqui para que Prometheus las levante.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  # Logs -> salida estandar del propio collector (suficiente para depuracion visible con
+  # "docker compose logs otel-collector"; no se agrega un backend de logs aparte).
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [debug]

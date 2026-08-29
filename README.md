@@ -7,6 +7,10 @@ Sistema distribuido de gestión de tickets de soporte técnico para un ISP, cons
 arquitectura de microservicios con persistencia distribuida real (CockroachDB), mensajería
 asíncrona (Kafka) y un pipeline analítico paralelo (Apache Spark).
 
+> ⚠️ **Importante — fecha límite de entrega indicada por el docente:** los commits para la
+> actividad **GA-SUM-06 / PE-U5 - CI/CD, Pruebas y Observabilidad** se pueden realizar y subir
+> al repositorio hasta el **viernes 28 de agosto de 2026**.
+
 ## Arquitectura
 
 | Microservicio | Puerto | Stack | Responsabilidad |

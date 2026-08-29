@@ -1,6 +1,7 @@
 # start-all.ps1 — Levanta todo el sistema SOPORTE de un solo golpe: cluster CockroachDB +
 # Kafka/MongoDB + auth-service + ticket-service + ai-service + notification-service +
-# report-service + frontend (los 5 microservicios de la Entrega 2 + infraestructura).
+# report-service + api-gateway + frontend (los 5 microservicios de la Entrega 2 +
+# el API Gateway de la Entrega 4, Modulo B + infraestructura).
 #
 # Requisitos en la maquina donde se corre:
 #   - Docker Desktop (con el motor corriendo)
@@ -76,7 +77,7 @@ function Resolve-MvnCommand {
 
 $mvnCmd = Resolve-MvnCommand
 
-Write-Host "=== 1/8: Cluster CockroachDB ===" -ForegroundColor Cyan
+Write-Host "=== 1/9: Cluster CockroachDB ===" -ForegroundColor Cyan
 Set-Location "$root\db-cluster"
 docker compose -f docker-compose.cockroach.yml up -d
 Write-Host "  Esperando a que el cluster acepte SQL..."
@@ -96,7 +97,7 @@ docker cp scripts\init_report_db.sql roach1:/init_report_db.sql
 docker exec roach1 cockroach sql --insecure -f /init_report_db.sql | Out-Null
 Write-Host "  -> Cluster y esquemas listos" -ForegroundColor Green
 
-Write-Host "`n=== 2/8: Kafka + MongoDB ===" -ForegroundColor Cyan
+Write-Host "`n=== 2/9: Kafka + MongoDB ===" -ForegroundColor Cyan
 Set-Location "$root\messaging"
 docker compose -f docker-compose.messaging.yml up -d
 Write-Host "  Esperando a que el broker de Kafka acepte conexiones..."
@@ -106,21 +107,21 @@ if (Wait-KafkaReady) {
     Write-Host "  -> Kafka no respondio a tiempo (notification-service/ai-service podrian fallar al conectarse)" -ForegroundColor Red
 }
 
-Write-Host "`n=== 3/8: auth-service ===" -ForegroundColor Cyan
+Write-Host "`n=== 3/9: auth-service ===" -ForegroundColor Cyan
 Set-Location "$root\services\auth-service"
 Start-Process -FilePath $mvnCmd -ArgumentList "spring-boot:run" `
     -RedirectStandardOutput "$env:TEMP\auth-service.out.log" -RedirectStandardError "$env:TEMP\auth-service.err.log" `
     -WindowStyle Hidden
 Wait-Health "http://localhost:8001/actuator/health" "auth-service" | Out-Null
 
-Write-Host "`n=== 4/8: ticket-service ===" -ForegroundColor Cyan
+Write-Host "`n=== 4/9: ticket-service ===" -ForegroundColor Cyan
 Set-Location "$root\services\svc-principal"
 Start-Process -FilePath $mvnCmd -ArgumentList "spring-boot:run" `
     -RedirectStandardOutput "$env:TEMP\ticket-service.out.log" -RedirectStandardError "$env:TEMP\ticket-service.err.log" `
     -WindowStyle Hidden
 Wait-Health "http://localhost:8002/actuator/health" "ticket-service" | Out-Null
 
-Write-Host "`n=== 5/8: ai-service ===" -ForegroundColor Cyan
+Write-Host "`n=== 5/9: ai-service ===" -ForegroundColor Cyan
 Set-Location "$root\services\ai-service"
 pip install -r requirements.txt --quiet
 Start-Process -FilePath "python" -ArgumentList "-m", "uvicorn", "app.main:app", "--port", "8004" `
@@ -128,7 +129,7 @@ Start-Process -FilePath "python" -ArgumentList "-m", "uvicorn", "app.main:app", 
     -WindowStyle Hidden
 Wait-Health "http://localhost:8004/health" "ai-service" | Out-Null
 
-Write-Host "`n=== 6/8: notification-service ===" -ForegroundColor Cyan
+Write-Host "`n=== 6/9: notification-service ===" -ForegroundColor Cyan
 Set-Location "$root\services\notification-service"
 npm install --quiet
 Start-Process -FilePath "node" -ArgumentList "src/index.js" `
@@ -136,18 +137,35 @@ Start-Process -FilePath "node" -ArgumentList "src/index.js" `
     -WindowStyle Hidden
 Wait-Health "http://localhost:8003/health" "notification-service" | Out-Null
 
-Write-Host "`n=== 7/8: report-service ===" -ForegroundColor Cyan
+Write-Host "`n=== 7/9: report-service ===" -ForegroundColor Cyan
 Set-Location "$root\services\report-service"
 Start-Process -FilePath $mvnCmd -ArgumentList "spring-boot:run" `
     -RedirectStandardOutput "$env:TEMP\report-service.out.log" -RedirectStandardError "$env:TEMP\report-service.err.log" `
     -WindowStyle Hidden
 Wait-Health "http://localhost:8005/actuator/health" "report-service" | Out-Null
 
-Write-Host "`n=== 8/8: Frontend ===" -ForegroundColor Cyan
-Set-Location "$root\frontend"
-Start-Process -FilePath "python" -ArgumentList "-m", "http.server", "5500" -WindowStyle Hidden
-Start-Sleep -Seconds 2
-Write-Host "  -> Frontend servido" -ForegroundColor Green
+Write-Host "`n=== 8/9: api-gateway ===" -ForegroundColor Cyan
+Set-Location "$root\services\api-gateway"
+Start-Process -FilePath $mvnCmd -ArgumentList "spring-boot:run" `
+    -RedirectStandardOutput "$env:TEMP\api-gateway.out.log" -RedirectStandardError "$env:TEMP\api-gateway.err.log" `
+    -WindowStyle Hidden
+Wait-Health "http://localhost:8000/actuator/health" "api-gateway" | Out-Null
+
+Write-Host "`n=== 9/9: Frontend (apps/web -- React, Entrega 4) ===" -ForegroundColor Cyan
+# El frontend viejo (frontend/, HTML plano de E2/E3) se reemplazo por apps/web
+# (Vite + React) en la Entrega 4: consola por rol, panel Admin/Reportes, login
+# rediseñado. apps/web/src/lib/apiClient.ts ya apunta por defecto al API Gateway
+# (localhost:8000), asi que no hace falta ningun .env para desarrollo local.
+Set-Location "$root\apps\web"
+if (-not (Test-Path "node_modules")) {
+    Write-Host "  Instalando dependencias (primera vez)..."
+    npm install --quiet
+}
+Start-Process -FilePath "npm.cmd" -ArgumentList "run", "dev" `
+    -RedirectStandardOutput "$env:TEMP\apps-web.out.log" -RedirectStandardError "$env:TEMP\apps-web.err.log" `
+    -WindowStyle Hidden
+Start-Sleep -Seconds 3
+Write-Host "  -> Frontend (apps/web) servido en http://localhost:5173" -ForegroundColor Green
 
 Write-Host "`n=== Creando cuentas de prueba (si no existen ya) ===" -ForegroundColor Cyan
 try {
@@ -163,14 +181,15 @@ Set-Location $root
 Write-Host "`n================================================================" -ForegroundColor Yellow
 Write-Host " TODO LISTO" -ForegroundColor Yellow
 Write-Host "================================================================" -ForegroundColor Yellow
-Write-Host " Abre en el navegador: http://localhost:5500/auth/index.html"
+Write-Host " Abre en el navegador: http://localhost:5173"
 Write-Host ""
 Write-Host " Cuentas de prueba:"
 Write-Host "   ADMIN:   admin@soporte.local / Admin123!"
 Write-Host "   CLIENTE: cliente@test.com / Passw0rd!"
 Write-Host ""
 Write-Host " Consola CockroachDB: http://localhost:8080"
-Write-Host " report-service (requiere token ADMIN): http://localhost:8005/api/v1/reports/summary"
-Write-Host " notification-service (demo/depuracion): http://localhost:8003/api/v1/notifications"
+Write-Host " API Gateway (punto de entrada unico, E4): http://localhost:8000"
+Write-Host " report-service (requiere token ADMIN, via gateway): http://localhost:8000/api/v1/reports/summary"
+Write-Host " notification-service (demo/depuracion, via gateway): http://localhost:8000/api/v1/notifications"
 Write-Host " Logs de cada servicio en: `$env:TEMP\<servicio>.out.log"
 Write-Host "================================================================"

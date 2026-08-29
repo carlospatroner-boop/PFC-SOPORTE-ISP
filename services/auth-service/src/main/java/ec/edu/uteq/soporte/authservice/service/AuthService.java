@@ -9,6 +9,7 @@ import ec.edu.uteq.soporte.authservice.exception.InvalidRequestException;
 import ec.edu.uteq.soporte.authservice.exception.InvalidTokenException;
 import ec.edu.uteq.soporte.authservice.exception.TokenReuseDetectedException;
 import ec.edu.uteq.soporte.authservice.exception.UserNotFoundException;
+import ec.edu.uteq.soporte.authservice.messaging.TechnicianEventPublisher;
 import ec.edu.uteq.soporte.authservice.repository.RefreshTokenRepository;
 import ec.edu.uteq.soporte.authservice.repository.UserRepository;
 import ec.edu.uteq.soporte.authservice.web.dto.AuthResponse;
@@ -41,16 +42,19 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final TechnicianEventPublisher technicianEventPublisher;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(UserRepository userRepository,
                         RefreshTokenRepository refreshTokenRepository,
                         JwtService jwtService,
-                        PasswordEncoder passwordEncoder) {
+                        PasswordEncoder passwordEncoder,
+                        TechnicianEventPublisher technicianEventPublisher) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.technicianEventPublisher = technicianEventPublisher;
     }
 
     @Transactional
@@ -62,8 +66,15 @@ public class AuthService {
     @Transactional
     public UserResponse createUserAsAdmin(CreateUserRequest request) {
         validateZoneForRole(request.role(), request.zone());
-        return UserResponse.from(createUser(
-                request.email(), request.password(), request.fullName(), request.role(), request.zone()));
+        User created = createUser(
+                request.email(), request.password(), request.fullName(), request.role(), request.zone());
+        if (request.role() == Role.TECNICO) {
+            // Publicar DESPUES de que la transaccion de creacion ya completo en memoria --
+            // si Kafka falla, technicianEventPublisher.publishCreated ya absorbe el error
+            // (ver su javadoc) y el alta del usuario en auth_db de todas formas es valida.
+            technicianEventPublisher.publishCreated(created);
+        }
+        return UserResponse.from(created);
     }
 
     public List<UserResponse> listUsers() {

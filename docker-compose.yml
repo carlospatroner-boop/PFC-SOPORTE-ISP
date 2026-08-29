@@ -1,0 +1,388 @@
+# docker-compose.yml — despliegue completo del PFC "Soporte Tecnico ISP" (equipo ACC)
+# desde cero, en una sola maquina (Modulo H / D9.4 de la Guia de Entrega 4:
+# "dockercomposeup + instrucciones despliegan todo desde cero").
+#
+# Uso:
+#   docker compose up -d --build
+#   (la primera vez tarda varios minutos: compila 5 microservicios Java + build de React)
+#
+# Que levanta, en orden de dependencia:
+#   1. Cluster CockroachDB (3 nodos) + init automatico de esquemas (servicio "db-init")
+#   2. Kafka + MongoDB (mensajeria para la saga de clasificacion de tickets)
+#   3. Los 5 microservicios de aplicacion (auth, ticket, ai, notification, report)
+#   4. El API Gateway (unico punto de entrada, puerto 8000)
+#   5. El frontend web (apps/web, servido por Nginx, puerto 5173)
+#   6. Observabilidad: OpenTelemetry Collector, Tempo (trazas), Prometheus (metricas),
+#      Grafana (dashboard unico con las 3 señales correlacionadas por trace_id)
+#
+# La app movil (apps/mobile) NO se levanta aqui -- no es un servicio de servidor, se
+# compila e instala aparte (ver apps/mobile/README.md); apunta a este mismo docker-compose
+# via 10.0.2.2:8000 desde el emulador.
+#
+# Verificar que todo esta arriba:
+#   curl http://localhost:8000/actuator/health   (gateway)
+#   abrir http://localhost:5173                  (web)
+#   abrir http://localhost:3000                  (grafana, admin/admin la primera vez)
+
+networks:
+  # NO marcar como "external: true": eso asume que la red ya existe de antemano (cierto en
+  # una maquina de desarrollo que la creo con los compose files sueltos de antes de unificar
+  # todo en este archivo), pero en una maquina limpia -- como un runner de GitHub Actions --
+  # esa red nunca existio, y "external: true" hace que "docker compose up" falle de inmediato
+  # con "network soporte-net declared as external, but could not be found" (encontrado
+  # corriendo el job "integration" del pipeline real). Sin "external", Compose crea la red si
+  # no existe y reutiliza la existente si ya esta -- funciona en los dos casos.
+  soporte-net:
+    name: soporte-net
+
+volumes:
+  # Apuntados por nombre explicito a los volumenes que ya existian desde
+  # db-cluster/docker-compose.cockroach.yml y messaging/docker-compose.messaging.yml,
+  # para no perder los datos de demo (los 504 tickets rebalanceados) al pasar a este
+  # compose unico -- Docker Compose reusa el volumen si ya existe en vez de crear uno
+  # vacio nuevo.
+  roach1-data:
+    name: db-cluster_roach1-data
+  roach2-data:
+    name: db-cluster_roach2-data
+  roach3-data:
+    name: db-cluster_roach3-data
+  kafka-data:
+    name: messaging_kafka-data
+  mongo-data:
+    name: messaging_mongo-data
+  grafana-data: {}
+  tempo-data: {}
+
+services:
+  # ============================================================
+  # 1. Persistencia distribuida (heredada sin cambios de la E3)
+  # ============================================================
+  roach1:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: roach1
+    hostname: roach1
+    command: start --insecure --max-offset=4500ms --locality=zone=quevedo-centro --join=roach1,roach2,roach3
+    ports:
+      - "26257:26257"
+      - "8083:8080"
+    volumes:
+      - roach1-data:/cockroach/cockroach-data
+    networks: [soporte-net]
+    mem_limit: 1024m
+    healthcheck:
+      # "?ready=1" exige que el nodo ya pertenezca a un cluster INICIALIZADO -- en un
+      # volumen limpio (cualquier runner de CI) eso nunca ocurre, porque quien inicializa
+      # el cluster es "db-init", y "db-init" espera a que este healthcheck pase primero
+      # (candado circular). En una maquina de desarrollo "funcionaba" solo porque el
+      # volumen ya traia un cluster inicializado de sesiones previas. Se usa "/health"
+      # a secas (liveness: el proceso esta arriba), no readiness -- suficiente para que
+      # "db-init" pueda conectarse y ejecutar "cockroach init".
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+  roach2:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: roach2
+    hostname: roach2
+    command: start --insecure --max-offset=4500ms --locality=zone=quevedo-norte --join=roach1,roach2,roach3
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    volumes:
+      - roach2-data:/cockroach/cockroach-data
+    networks: [soporte-net]
+    mem_limit: 1024m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+  roach3:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: roach3
+    hostname: roach3
+    command: start --insecure --max-offset=4500ms --locality=zone=quevedo-sur --join=roach1,roach2,roach3
+    ports:
+      - "26259:26257"
+      - "8082:8080"
+    volumes:
+      - roach3-data:/cockroach/cockroach-data
+    networks: [soporte-net]
+    mem_limit: 1024m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+  # Inicializa el cluster (una sola vez) y carga los esquemas -- reemplaza los pasos
+  # manuales de "docker exec + docker cp" que hacia start-all.ps1, para que
+  # "docker compose up" solo, sin ningun script aparte, deje el sistema listo.
+  db-init:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: db-init
+    depends_on:
+      roach1: { condition: service_healthy }
+      roach2: { condition: service_healthy }
+      roach3: { condition: service_healthy }
+    volumes:
+      - ./db-cluster/scripts:/scripts:ro
+      - ./db-cluster/config:/config:ro
+    networks: [soporte-net]
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "for i in $(seq 1 30); do
+         out=$(cockroach init --insecure --host=roach1 2>&1) && break;
+         echo \"$$out\" | grep -qi 'already been initialized' && break;
+         echo \"db-init: intento $$i de 'cockroach init' fallo, reintentando en 2s: $$out\";
+         sleep 2;
+       done &&
+       for i in $(seq 1 30); do
+         cockroach sql --insecure --host=roach1 -e 'SELECT 1;' >/dev/null 2>&1 && break;
+         echo \"db-init: el cluster aun no acepta conexiones SQL (intento $$i), reintentando en 2s\";
+         sleep 2;
+       done &&
+       cockroach sql --insecure --host=roach1 -f /scripts/init_db.sql &&
+       cockroach sql --insecure --host=roach1 -f /config/zones.sql &&
+       cockroach sql --insecure --host=roach1 -f /scripts/init_auth_db.sql &&
+       cockroach sql --insecure --host=roach1 -e 'ALTER TABLE auth_db.users ADD COLUMN IF NOT EXISTS zone STRING;' &&
+       cockroach sql --insecure --host=roach1 -f /scripts/init_report_db.sql &&
+       echo 'db-init: esquemas listos'"
+    restart: "no"
+
+  # ============================================================
+  # 2. Mensajeria (heredada sin cambios de la E3)
+  # ============================================================
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: "4L6g3nShT-eMCtK--X86sw"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks: [soporte-net]
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    hostname: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks: [soporte-net]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ============================================================
+  # 3. Microservicios de aplicacion
+  # ============================================================
+  auth-service:
+    build: { context: ./services/auth-service }
+    container_name: auth-service
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      kafka: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+    ports: ["8001:8001"]
+    environment:
+      DB_URL: jdbc:postgresql://roach1:26257/auth_db?sslmode=disable
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: auth-service
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    networks: [soporte-net]
+
+  ticket-service:
+    build: { context: ./services/svc-principal }
+    container_name: ticket-service
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      kafka: { condition: service_healthy }
+      auth-service: { condition: service_started }
+      otel-collector: { condition: service_started }
+    ports: ["8002:8002"]
+    environment:
+      DB_URL: jdbc:postgresql://roach1:26257/ticket_db?sslmode=disable
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      AUTH_SERVICE_URL: http://auth-service:8001/api/v1/auth
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: ticket-service
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    networks: [soporte-net]
+
+  ai-service:
+    build: { context: ./services/ai-service }
+    container_name: ai-service
+    depends_on:
+      kafka: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+    ports: ["8004:8004"]
+    environment:
+      AI_SERVICE_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      AI_SERVICE_MONGO_URI: mongodb://mongo:27017
+    networks: [soporte-net]
+
+  notification-service:
+    build: { context: ./services/notification-service }
+    container_name: notification-service
+    depends_on:
+      kafka: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+    ports: ["8003:8003"]
+    environment:
+      NOTIFICATION_SERVICE_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      NOTIFICATION_SERVICE_MONGO_URI: mongodb://mongo:27017
+    networks: [soporte-net]
+
+  report-service:
+    build: { context: ./services/report-service }
+    container_name: report-service
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      kafka: { condition: service_healthy }
+      auth-service: { condition: service_started }
+      otel-collector: { condition: service_started }
+    ports: ["8005:8005"]
+    environment:
+      DB_URL: jdbc:postgresql://roach1:26257/report_db?sslmode=disable
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      AUTH_SERVICE_URL: http://auth-service:8001/api/v1/auth
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: report-service
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    networks: [soporte-net]
+
+  # ============================================================
+  # 4. API Gateway -- unico punto de entrada (E4, Modulo B)
+  # ============================================================
+  api-gateway:
+    build: { context: ./services/api-gateway }
+    container_name: api-gateway
+    depends_on:
+      - auth-service
+      - ticket-service
+      - ai-service
+      - notification-service
+      - report-service
+    ports: ["8000:8000"]
+    environment:
+      AUTH_SERVICE_URI: http://auth-service:8001
+      TICKET_SERVICE_URI: http://ticket-service:8002
+      NOTIFICATION_SERVICE_URI: http://notification-service:8003
+      AI_SERVICE_URI: http://ai-service:8004
+      REPORT_SERVICE_URI: http://report-service:8005
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: api-gateway
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    networks: [soporte-net]
+
+  # ============================================================
+  # 5. Frontend web (E4, Modulo B)
+  # ============================================================
+  web:
+    build: { context: ./apps/web }
+    container_name: web
+    depends_on: [api-gateway]
+    ports: ["5173:80"]
+    networks: [soporte-net]
+
+  # ============================================================
+  # 6. Observabilidad distribuida (E4, Modulo F)
+  # ============================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.107.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./ops/otel-collector/config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8888:8888" # metricas propias del collector
+    networks: [soporte-net]
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "3200:3200" # API HTTP de Tempo, util para consultar trazas fuera de Grafana
+    volumes:
+      - ./ops/tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    networks: [soporte-net]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [soporte-net]
+
+  # cAdvisor -- unica forma practica de tener metricas de uso de recursos POR CONTENEDOR
+  # (CPU/memoria) en Prometheus; ninguno de los servicios de aplicacion expone eso por si
+  # solo (sus /actuator/prometheus dan metricas de la JVM, no del contenedor). Alimenta el
+  # panel obligatorio "uso de recursos por contenedor" del dashboard (Modulo F, item 5).
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    ports: ["8085:8080"]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [soporte-net]
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: grafana
+    depends_on: [prometheus, tempo]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/grafana/pfc-dashboard.json:/var/lib/grafana/dashboards/pfc-dashboard.json:ro
+    networks: [soporte-net]

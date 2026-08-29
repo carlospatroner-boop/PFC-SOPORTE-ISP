@@ -1,0 +1,8 @@
+# Evita que Git (con autocrlf=true en Windows, la config por defecto) vuelva a convertir
+# gradlew a CRLF -- eso rompio el wrapper en el runner de GitHub Actions (Linux) con un
+# error real: "Could not find or load main class \"-Xmx64m\"", porque el script termina
+# leyendo mal sus propias opciones de memoria cuando tiene terminadores de linea de Windows.
+* text=auto eol=lf
+*.jar binary
+gradlew text eol=lf
+*.bat text eol=crlf

@@ -221,7 +221,18 @@ jobs:
         # cache de capas corrupta entre invocaciones y produce el error observado en
         # el run 33264918110 (matrix notification-service):
         # "buildx failed with: ERROR: failed to build: unknown blob"
+        #
+        # driver-opts: network=host -- por defecto este builder corre BuildKit dentro
+        # de un contenedor Docker aislado (driver "docker-container"), con su propia
+        # red bridge. Eso puede causar fallos intermitentes de DNS/red para cualquier
+        # RUN que necesite internet (ej. "mvn dependency:go-offline" descargando de
+        # repo.maven.apache.org / repo.spring.io), como se vio en el run 33279077034
+        # (matrix api-gateway): "mvn dependency:go-offline -B ... exit code: 1".
+        # Con network=host, el builder comparte la red del runner directamente,
+        # eliminando esa capa de aislamiento de red.
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
 
       - name: Nombre del repositorio en minusculas
         # Docker exige que el nombre del repositorio de una imagen sea todo minusculas

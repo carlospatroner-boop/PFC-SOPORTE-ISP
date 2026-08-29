@@ -87,3 +87,44 @@ patrón común a los tres problemas.
 
 \tableofcontents
 \newpage
+
+\section{Contexto}
+
+El equipo ACC mantiene un pipeline de integración continua en
+\texttt{.github/workflows/ci-cd.yml}, compuesto por 7 jobs encadenados mediante \texttt{needs:}
+para que cada etapa solo se ejecute si la anterior pasó:
+
+\begin{table}[H]
+\centering
+\caption{Los 7 jobs del pipeline}
+\begin{tabular}{@{}p{3.2cm}p{10.8cm}@{}}
+\toprule
+\textbf{Job} & \textbf{Qué hace} \\
+\midrule
+\texttt{lint} & Análisis estático de todos los subproyectos (backend, web, móvil). \\
+\texttt{test-backend} & Pruebas unitarias e integración de los microservicios Java, Node.js y
+Python. \\
+\texttt{test-web} & Pruebas unitarias y de contrato (Pact) de \texttt{apps/web}. \\
+\texttt{test-mobile} & Pruebas unitarias de \texttt{apps/mobile} (Kotlin/Jetpack Compose). \\
+\texttt{build-images} & Matriz de 7 destinos: construye y publica en GHCR la imagen Docker de
+cada microservicio y de \texttt{apps/web}. Solo publica en push, no en pull request. \\
+\texttt{build-mobile-apk} & Compila el APK de depuración de \texttt{apps/mobile} y lo publica
+como artefacto del pipeline. \\
+\texttt{integration} & Levanta el stack completo con \texttt{docker compose up -d --build} y
+corre contra él: verificación del proveedor del contrato Pact y la suite completa de Playwright
+E2E en 3 navegadores. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los primeros 6 jobs pasaban de forma consistente. El séptimo, \texttt{integration}, fallaba en
+\emph{todas} las corridas sobre GitHub Actions, mientras que el mismo
+\texttt{docker compose up -d --build} que ese job ejecuta funcionaba sin problema en las máquinas
+de desarrollo del equipo. Esa asimetría -- funciona en local, falla siempre en el runner -- fue
+la pista central: el problema no era una falla puntual ni un error de sintaxis, sino una
+diferencia estructural entre ambos entornos que el equipo tuvo que identificar con precisión, no
+adivinar.
+
+
+
+

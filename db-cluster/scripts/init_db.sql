@@ -52,6 +52,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS tickets_id_key ON tickets (id);
 CREATE INDEX IF NOT EXISTS idx_tickets_zone ON tickets (zone);
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status);
 
+-- Agrupacion de tickets por averia (Adicion 1 de la Ampliacion del Modulo G, equipo ACC --
+-- ver docs/adr/0008-correl-incidencias.md). Tabla chica, no particionada, igual que
+-- "technicians": no es el registro de negocio principal, es una agrupacion sobre "tickets".
+-- OJO: "incidencias" (esta tabla) NO tiene relacion con "network_incidents_summary" de mas
+-- abajo -- esa es un agregado de telemetria que llena Spark, esta es la agrupacion de
+-- tickets que decide la estrategia de correlacion (CORREL) en tiempo real.
+CREATE TABLE IF NOT EXISTS incidencias (
+    id           UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    zone         STRING NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    correl_mode  STRING NOT NULL  -- c0 | c1 | c2: con que estrategia se abrio
+);
+
+CREATE INDEX IF NOT EXISTS idx_incidencias_zone_created_at ON incidencias (zone, created_at);
+
+CREATE TABLE IF NOT EXISTS incidencia_tickets (
+    incidencia_id  UUID NOT NULL REFERENCES incidencias(id),
+    ticket_id      UUID NOT NULL,
+    PRIMARY KEY (incidencia_id, ticket_id)
+);
+
 -- Tabla de incidencias de red (telemetria), respaldo del reporte agregado que
 -- produce el pipeline Spark (Paso 8 — integracion). No se carga aqui; la llena
 -- el job de Spark o un script de materializacion posterior.

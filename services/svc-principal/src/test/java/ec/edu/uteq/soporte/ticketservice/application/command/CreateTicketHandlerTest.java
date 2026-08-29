@@ -3,6 +3,7 @@ package ec.edu.uteq.soporte.ticketservice.application.command;
 import ec.edu.uteq.soporte.ticketservice.application.ForbiddenException;
 import ec.edu.uteq.soporte.ticketservice.application.TicketAuthorization;
 import ec.edu.uteq.soporte.ticketservice.application.TicketWriter;
+import ec.edu.uteq.soporte.ticketservice.application.correlation.CorrelationService;
 import ec.edu.uteq.soporte.ticketservice.domain.EventPublisher;
 import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
 import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
@@ -40,9 +41,13 @@ class CreateTicketHandlerTest {
     @Mock
     private EventPublisher eventPublisher;
 
+    @Mock
+    private CorrelationService correlationService;
+
     @Test
     void createTicket_persistsWithNuevoStatusAndDefaultSla() {
-        CreateTicketHandler handler = new CreateTicketHandler(authorization, ticketFactory, ticketWriter, eventPublisher);
+        CreateTicketHandler handler = new CreateTicketHandler(
+                authorization, ticketFactory, ticketWriter, eventPublisher, correlationService);
         when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CreateTicketCommand command = new CreateTicketCommand(
@@ -60,7 +65,8 @@ class CreateTicketHandlerTest {
 
     @Test
     void createTicket_publishesTicketCreatedEvent() {
-        CreateTicketHandler handler = new CreateTicketHandler(authorization, ticketFactory, ticketWriter, eventPublisher);
+        CreateTicketHandler handler = new CreateTicketHandler(
+                authorization, ticketFactory, ticketWriter, eventPublisher, correlationService);
         when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CreateTicketCommand command = new CreateTicketCommand(
@@ -79,7 +85,8 @@ class CreateTicketHandlerTest {
 
     @Test
     void createTicket_asAdmin_isAllowed() {
-        CreateTicketHandler handler = new CreateTicketHandler(authorization, ticketFactory, ticketWriter, eventPublisher);
+        CreateTicketHandler handler = new CreateTicketHandler(
+                authorization, ticketFactory, ticketWriter, eventPublisher, correlationService);
         when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CreateTicketCommand command = new CreateTicketCommand(
@@ -90,7 +97,8 @@ class CreateTicketHandlerTest {
 
     @Test
     void createTicket_asTecnico_isForbidden() {
-        CreateTicketHandler handler = new CreateTicketHandler(authorization, ticketFactory, ticketWriter, eventPublisher);
+        CreateTicketHandler handler = new CreateTicketHandler(
+                authorization, ticketFactory, ticketWriter, eventPublisher, correlationService);
         CreateTicketCommand command = new CreateTicketCommand(
                 Zone.QUEVEDO_NORTE, "Titulo", "Descripcion", null, null, UUID.randomUUID(), "TECNICO");
 

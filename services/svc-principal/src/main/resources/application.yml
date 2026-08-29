@@ -47,6 +47,19 @@ auth:
     # /api/v1/tickets/** -- ver config/AuthGatewayFilter.java.
     base-url: ${AUTH_SERVICE_URL:http://localhost:8001/api/v1/auth}
 
+# Adicion 1 (Ampliacion del Modulo G) -- ver application/correlation/CorrelationService.java
+# y docs/adr/0008-correl-incidencias.md. CORREL selecciona la estrategia: c0 (sin
+# correlacion, linea base) | c1 (zona+ventana) | c2 (zona+ventana+telemetria).
+correlation:
+  mode: ${CORREL:c0}
+  window-minutes: ${CORREL_WINDOW_MINUTES:15}
+
+# Cliente gRPC hacia telemetry-service (PE-U1) -- solo lo usa la estrategia c2.
+telemetry:
+  service:
+    host: ${TELEMETRY_SERVICE_HOST:localhost}
+    grpc-port: ${TELEMETRY_SERVICE_GRPC_PORT:9095}
+
 management:
   endpoints:
     web:

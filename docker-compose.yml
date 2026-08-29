@@ -233,6 +233,7 @@ services:
       kafka: { condition: service_healthy }
       auth-service: { condition: service_started }
       otel-collector: { condition: service_started }
+      telemetry-service: { condition: service_started }
     ports: ["8002:8002"]
     environment:
       DB_URL: jdbc:postgresql://roach1:26257/ticket_db?sslmode=disable
@@ -242,6 +243,11 @@ services:
       OTEL_SERVICE_NAME: ticket-service
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
+      # Adicion 1 (Ampliacion del Modulo G, ver docs/adr/0008-correl-incidencias.md):
+      # c0 (default) | c1 | c2. Se cambia aqui para correr el experimento con cada modo.
+      CORREL: ${CORREL:-c0}
+      TELEMETRY_SERVICE_HOST: telemetry-service
+      TELEMETRY_SERVICE_GRPC_PORT: "9095"
     networks: [soporte-net]
 
   ai-service:
@@ -283,6 +289,25 @@ services:
       AUTH_SERVICE_URL: http://auth-service:8001/api/v1/auth
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: report-service
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    networks: [soporte-net]
+
+  # PE-U1 (ver docs/adr/0007-pe-u1-telemetria.md): canal de telemetria de equipos del
+  # abonado y latidos de nodo. Sin CockroachDB ni Kafka a proposito -- es un canal, no un
+  # registro de negocio, y su buffer vive en memoria del propio servicio.
+  telemetry-service:
+    build: { context: ./services/telemetry-service }
+    container_name: telemetry-service
+    depends_on:
+      otel-collector: { condition: service_started }
+    ports:
+      - "8006:8006"   # HTTP (/actuator/health)
+      - "9500:9500"   # servidor de sockets TCP (canal de telemetria)
+      - "9095:9095"   # gRPC (consulta del registro ya ordenado por Lamport)
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: telemetry-service
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
     networks: [soporte-net]

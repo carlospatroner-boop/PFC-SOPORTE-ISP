@@ -334,7 +334,12 @@ jobs:
         working-directory: apps/web
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          # playwright.config.ts define 3 proyectos (chromium/firefox/webkit -- ver
+          # comentario ahi, requisito de "Compatibilidad" de la rubrica). Instalar solo
+          # "chromium" aqui hacia que firefox/webkit fallaran con "Executable doesn't
+          # exist" apenas Chromium pasaba sus 3 pruebas. Sin argumento, install trae los
+          # 3 navegadores que la config realmente usa.
+          npx playwright install --with-deps
 
       - name: Playwright E2E (contra el stack real levantado arriba)
         working-directory: apps/web

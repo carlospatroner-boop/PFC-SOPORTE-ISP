@@ -239,3 +239,35 @@ manual. La siguiente corrida real en GitHub Actions confirmó
 \texttt{roach1/roach2/roach3: Healthy} y el job \texttt{integration} avanzó más allá de este
 punto por primera vez en todo el proceso de depuración.
 
+\section{Problema 2: datos de demo faltantes en el contrato Pact}
+
+\subsection{Síntoma}
+Resuelto el problema anterior, el job avanzó considerablemente más lejos -- hasta la
+verificación del lado proveedor del contrato Pact, penúltimo paso del job -- y ahí falló con:
+
+\begin{lstlisting}[caption={Fallo real de la verificacion del contrato}]
+1) Verifying a pact between soporte-web and ticket-service - una peticion GET
+   de la lista de tickets, sin filtros, con un JWT valido de ADMIN has a
+   matching body
+
+   1.1) body: $.data Variant at index 0 ({"ticketId":"c8e57689-...",
+        "status":"RESUELTO", ...}) was not found in the actual list
+\end{lstlisting}
+
+El ticket que el contrato esperaba encontrar en la respuesta real de \texttt{ticket-service}
+simplemente no existía en la base de datos.
+
+\subsection{Investigación}
+El método \texttt{@State} de la prueba (\texttt{TicketServiceProviderPactTest}) era, hasta ese
+momento, un no-op a propósito, con un comentario explícito que decía que el stack "ya tiene datos
+de demo con tickets visibles para ADMIN", citando un script,
+\texttt{resultados/rebalance\_demo\_tickets.sql}, como la fuente de esos datos. Se buscó ese
+archivo en el repositorio completo, incluyendo todo el historial de commits, y se confirmó que
+\textbf{nunca se llegó a versionar en git} -- no existe ni existió jamás en ningún commit. Solo
+había existido, de forma manual y nunca documentada como tal, en el volumen de Docker de la
+persona que lo escribió originalmente en su propia máquina.
+
+Es exactamente el mismo patrón de fondo que el Problema 1: la máquina de desarrollo
+"funcionaba" solo porque conservaba un estado acumulado que un entorno realmente limpio nunca
+podría reproducir por su cuenta.
+

@@ -363,3 +363,71 @@ Se instalaron los 3 navegadores en local (confirmando la presencia real de los b
 completas contra el stack real levantado, confirmando que ningún caso volvía a fallar con el
 error de ejecutable faltante, en ningún navegador, antes de subir el cambio.
 
+
+\section{Resultado}
+
+Con los tres cambios integrados en commits sucesivos sobre la misma rama, el pipeline completo --
+los 7 jobs, incluidos los 7 destinos de la matriz de \texttt{build-images} y
+\texttt{build-mobile-apk} -- quedó en verde sobre un mismo commit, cumpliendo el requisito de la
+rúbrica de que los 7 jobs pasen juntos en el último commit de la entrega.
+
+\begin{table}[H]
+\centering
+\caption{Resumen de las tres causas raíz encontradas y corregidas}
+\begin{tabular}{@{}p{2.6cm}p{4.6cm}p{4.4cm}p{2.6cm}@{}}
+\toprule
+\textbf{Problema} & \textbf{Causa raíz} & \textbf{Corrección} & \textbf{Intento previo fallido} \\
+\midrule
+Healthcheck de CockroachDB & Candado circular: \texttt{?ready=1} exige clúster ya inicializado,
+pero quien inicializa espera a ese mismo healthcheck & \texttt{/health} (liveness) + reintentos
+de \texttt{cockroach init} + espera activa a SQL & Aumentar \texttt{retries}/
+\texttt{start\_period} -- solo retrasó la falla \\
+\addlinespace
+Contrato Pact & Datos de demo asumidos como ya existentes, en un script nunca versionado en git &
+El propio \texttt{@State} inserta los datos por SQL (\texttt{DELETE}+\texttt{INSERT}) &
+\texttt{UPSERT} -- chocó contra un índice único aparte \\
+\addlinespace
+Playwright E2E & Paso de instalación restringido a un solo navegador (\texttt{chromium}) &
+Instalar los 3 navegadores que la configuración define & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Amenazas a la validez}
+
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Un solo entorno de runner observado.} Todas las corridas se hicieron sobre los
+  runners \texttt{ubuntu-latest} compartidos de GitHub Actions; no se probó el pipeline en otro
+  proveedor de CI, así que no se puede afirmar que estas sean las únicas causas posibles de falla
+  en un entorno "limpio" en general, solo que lo fueron en el entorno real usado por el equipo.
+  \item \textbf{El primer intento del Problema 1 no se descartó por análisis, sino por
+  observación.} Aumentar el presupuesto de tiempo era una hipótesis razonable a priori; se supo
+  que era insuficiente solo después de ver el resultado del siguiente run real, no por haber
+  anticipado el candado circular de antemano. Esto es consistente con la metodología descrita
+  (diagnosticar con logs reales antes de dar un fix por bueno), pero vale dejarlo explícito.
+  \item \textbf{La verificación de idempotencia del Problema 2 se hizo con 2 corridas, no más.}
+  Es suficiente para confirmar que el bug del \texttt{UPSERT} se corrigió, pero no constituye una
+  prueba exhaustiva de que no exista alguna otra condición de carrera no observada en ese punto.
+\end{itemize}
+
+\section{Conclusiones}
+
+Los tres problemas comparten un mismo patrón de fondo: algo que \emph{parecía} funcionar porque
+la máquina de desarrollo del equipo conservaba un estado acumulado -- un volumen ya inicializado,
+datos de demo cargados a mano, o simplemente un navegador ya instalado de una sesión anterior --
+que un entorno realmente limpio, como el de un runner de GitHub Actions, nunca reproduce por su
+cuenta. Ninguno de los tres era un problema de "CI/CD mal configurado" en abstracto: cada uno
+tenía una causa raíz concreta y verificable con el log real del paso que fallaba, y cada
+corrección -- incluidos los dos bugs secundarios encontrados en el propio proceso de verificar
+las correcciones principales -- se probó de punta a punta contra el stack real, nunca simulada,
+antes de darla por buena.
+
+Una lección práctica adicional: el primer intento de arreglar el Problema 1 (aumentar tiempos de
+espera) fue una hipótesis razonable que resultó incorrecta, y solo se supo que era incorrecta
+observando el resultado real del siguiente run, no por haberla anticipado de antemano. Aumentar
+un timeout es, en general, un cambio de bajo riesgo y fácil de justificar -- pero cuando la causa
+real es estructural (un candado circular, en este caso), ningún valor de tiempo, por grande que
+sea, lo resuelve. La señal de que había que seguir buscando no fue que el fix "no funcionara" en
+abstracto, sino que el mismo síntoma reapareciera después de más tiempo en vez de desaparecer.
+
+\end{document}

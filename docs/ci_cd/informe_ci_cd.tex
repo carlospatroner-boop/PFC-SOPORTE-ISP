@@ -143,5 +143,30 @@ se repite en los tres problemas de este informe. En Windows, la instalación de 
 visible para sesiones de terminal ya abiertas, lo que obligó a invocar el binario por su ruta
 absoluta hasta abrir una sesión nueva.
 
+\section{Problema 1: candado circular en el healthcheck de CockroachDB}
+
+\subsection{Síntoma inicial}
+El paso \texttt{docker compose up -d --build} fallaba con
+\texttt{dependency failed to start: container roach1 is unhealthy}, después de aproximadamente
+70 segundos de espera.
+
+\subsection{Primer intento: aumentar el presupuesto de tiempo (insuficiente)}
+La hipótesis inicial, razonable dado que un runner compartido de GitHub Actions tiene menos CPU
+disponible que una máquina de desarrollo dedicada, fue que CockroachDB simplemente necesitaba más
+tiempo para formar el clúster bajo contención de recursos. Se subió el presupuesto del
+healthcheck:
+
+\begin{lstlisting}[language=yaml,caption={Primer intento: mas tiempo, no resolvio el problema}]
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+  interval: 10s
+  timeout: 5s
+  retries: 15        # antes: 5
+  start_period: 60s   # antes: 20s
+\end{lstlisting}
+
+El resultado del siguiente run real: la falla \emph{seguía ocurriendo}, ahora después de
+aproximadamente 3 minutos y 21 segundos en vez de 70 segundos. Aumentar el tiempo no cambió el
+resultado, solo lo retrasó -- la señal clara de que la causa no era de tiempo, sino estructural.
 
 

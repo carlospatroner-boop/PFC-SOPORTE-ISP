@@ -271,3 +271,51 @@ Es exactamente el mismo patrón de fondo que el Problema 1: la máquina de desar
 "funcionaba" solo porque conservaba un estado acumulado que un entorno realmente limpio nunca
 podría reproducir por su cuenta.
 
+\subsection{Solución}
+Se reescribió el método \texttt{@State} para que inserte, por SQL directo, exactamente los dos
+tickets que el archivo de contrato (\texttt{pacts/soporte-web-ticket-service.json}) necesita --
+es precisamente para eso que existe el mecanismo \texttt{@State} de Pact: que la propia prueba
+garantice su precondición de forma explícita y reproducible, en vez de depender de un dato
+externo invisible que nadie versionó.
+
+\begin{lstlisting}[language=Java,caption={Extracto del @State corregido}]
+@State("el rol ADMIN tiene al menos un ticket visible")
+void elRolAdminTieneAlMenosUnTicketVisible() throws Exception {
+    try (Connection conn = DriverManager.getConnection(
+            "jdbc:postgresql://localhost:26257/ticket_db?sslmode=disable",
+            "root", "")) {
+        // ... inserta por SQL directo exactamente los tickets que el
+        // archivo de contrato espera encontrar.
+    }
+}
+\end{lstlisting}
+
+\subsection{Bug adicional encontrado durante la verificación: \texttt{UPSERT} vs. índice único}
+Al probar esta corrección contra el stack real (no simulada) se encontró un segundo bug, más
+pequeño pero real: el primer intento usó \texttt{UPSERT INTO} para insertar los tickets, y falló
+con \texttt{duplicate key value violates unique constraint "tickets\_id\_key"}.
+
+La causa: \texttt{UPSERT} en CockroachDB solo resuelve conflictos contra la \emph{primary key}
+compuesta de la tabla (\texttt{created\_at}, \texttt{id}); la tabla \texttt{tickets} tiene además
+un índice único \emph{aparte} sobre \texttt{id} en solitario (\texttt{tickets\_id\_key}, agregado
+para que las búsquedas por id no tengan que escanear las 4 particiones). Como esos tickets de
+demo ya existían de pruebas manuales anteriores en el mismo stack, con un valor distinto de
+\texttt{created\_at}, el \texttt{UPSERT} no los reconoció como el mismo registro y chocó contra
+ese índice en vez de actualizar la fila.
+
+\begin{lstlisting}[language=SQL,caption={Reemplazo de UPSERT por DELETE + INSERT}]
+-- Antes (fallaba si el ticket ya existia con otro created_at):
+UPSERT INTO tickets (created_at, id, ...) VALUES (?, ?, ...)
+
+-- Despues (idempotente sin importar el estado previo de la tabla):
+DELETE FROM tickets WHERE id = ?;
+INSERT INTO tickets (created_at, id, ...) VALUES (?, ?, ...);
+\end{lstlisting}
+
+\subsection{Verificación}
+Se corrió la prueba dos veces seguidas contra el stack real con Maven real (no una ejecución
+simulada): la primera corrida expuso el bug del \texttt{UPSERT} en vivo, con el error real de
+CockroachDB; tras aplicar el fix, ambas corridas pasaron 2/2 de forma consistente, confirmando
+la idempotencia real del mecanismo sin importar si los tickets ya existían de una corrida
+anterior.
+

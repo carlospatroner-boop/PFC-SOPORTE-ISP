@@ -125,6 +125,23 @@ la pista central: el problema no era una falla puntual ni un error de sintaxis, 
 diferencia estructural entre ambos entornos que el equipo tuvo que identificar con precisión, no
 adivinar.
 
+\subsection{Metodología de diagnóstico}
+
+El primer obstáculo fue de \emph{visibilidad}, no de código: la API pública de GitHub
+(\texttt{checks-runs/.../annotations}) solo devuelve mensajes genéricos del tipo
+\texttt{"Process completed with exit code 1"}, sin el log real del comando que falló, y
+descargar el log completo de un run sin autenticación devuelve \texttt{403 Must have admin
+rights}. Con solo esa API, cada intento de arreglo era en el fondo una conjetura educada sobre
+qué pudo haber fallado.
+
+El equipo instaló y autenticó la CLI oficial de GitHub (\texttt{gh}), que sí da acceso al log
+completo de cada paso individual del job (\texttt{gh run view <id> --log-failed}). Este cambio
+de herramienta fue lo que permitió pasar de "adivinar la causa y esperar a ver si el siguiente
+run pasa" a "leer el error real, confirmarlo, y recién entonces corregirlo" -- el patrón que
+se repite en los tres problemas de este informe. En Windows, la instalación de \texttt{gh} vía
+\texttt{winget} presentó además una complicación menor: el \texttt{PATH} actualizado no era
+visible para sesiones de terminal ya abiertas, lo que obligó a invocar el binario por su ruta
+absoluta hasta abrir una sesión nueva.
 
 
 

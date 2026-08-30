@@ -319,3 +319,47 @@ CockroachDB; tras aplicar el fix, ambas corridas pasaron 2/2 de forma consistent
 la idempotencia real del mecanismo sin importar si los tickets ya existían de una corrida
 anterior.
 
+\section{Problema 3: Playwright solo instalaba Chromium}
+
+\subsection{Síntoma}
+Con los dos problemas anteriores resueltos, el job llegó por primera vez hasta las pruebas E2E de
+Playwright. Los 3 casos de Chromium pasaron:
+
+\begin{lstlisting}[caption={Chromium paso, Firefox y WebKit fallaron de inmediato}]
+  ok 1 [chromium] un ADMIN inicia sesion y ve la consola con tickets reales
+  ok 2 [chromium] abrir un ticket muestra su detalle completo
+  ok 3 [chromium] credenciales invalidas muestran un error real del backend
+
+  1) [firefox] un ADMIN inicia sesion...
+     Error: browserType.launch: Executable doesn't exist at
+     /home/runner/.cache/ms-playwright/firefox-1538/firefox/firefox
+\end{lstlisting}
+
+Firefox y WebKit fallaban de inmediato, sin siquiera llegar a intentar abrir una página --
+el navegador simplemente no estaba instalado en el runner.
+
+\subsection{Causa raíz}
+\texttt{playwright.config.ts} define 3 proyectos (\texttt{chromium}, \texttt{firefox},
+\texttt{webkit} -- requisito de "Compatibilidad" de la rúbrica de Entrega 4: la web debe
+funcionar en Chrome, Firefox y Safari, usando WebKit como el mismo motor de renderizado que usa
+Safari). El paso de instalación del workflow, sin embargo, decía:
+
+\begin{lstlisting}[language=bash,caption={Paso de instalacion original, restringido a un solo navegador}]
+npx playwright install --with-deps chromium
+\end{lstlisting}
+
+El argumento \texttt{chromium} restringía la instalación a un solo navegador de los tres que la
+configuración realmente usa -- una desconexión simple entre lo que el \texttt{.yml} del pipeline
+instalaba y lo que el propio \texttt{playwright.config.ts} del proyecto exigía.
+
+\subsection{Solución}
+\begin{lstlisting}[language=bash,caption={Correccion: sin argumento, instala los navegadores que la config usa}]
+npx playwright install --with-deps
+\end{lstlisting}
+
+\subsection{Verificación}
+Se instalaron los 3 navegadores en local (confirmando la presencia real de los binarios de
+\texttt{firefox} y \texttt{webkit} en la caché de Playwright) y se corrieron las 9 pruebas E2E
+completas contra el stack real levantado, confirmando que ningún caso volvía a fallar con el
+error de ejecutable faltante, en ningún navegador, antes de subir el cambio.
+

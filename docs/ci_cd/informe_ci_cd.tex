@@ -205,4 +205,37 @@ encontraban su directorio de datos ya inicializado, y pasaban el healthcheck de 
 runner de GitHub Actions, en cambio, arranca siempre desde un volumen completamente vacío, así
 que el candado se activa sin excepción, cien por ciento de las veces.
 
+\subsection{Solución definitiva}
+\begin{itemize}[leftmargin=1.2em]
+  \item Los 3 healthchecks se cambiaron a \texttt{/health} (sin \texttt{?ready=1}) -- verifica
+  solo que el proceso está vivo (\emph{liveness}), no que el clúster ya esté inicializado. Esto
+  desbloquea a \texttt{db-init} para que pueda arrancar y ejecutar \texttt{cockroach init}.
+  \item Se agregó un bucle de reintentos alrededor de \texttt{cockroach init} (hasta 30 intentos,
+  2 s entre cada uno) y una segunda espera activa a que el clúster acepte conexiones SQL antes de
+  correr los scripts de esquema, para cerrar una carrera residual pequeña entre "el nodo terminó
+  de inicializarse" y "el nodo ya acepta SQL real".
+\end{itemize}
+
+\begin{lstlisting}[language=bash,caption={Extracto del entrypoint corregido de db-init}]
+for i in $(seq 1 30); do
+  out=$(cockroach init --insecure --host=roach1 2>&1) && break
+  echo "$out" | grep -qi 'already been initialized' && break
+  echo "db-init: intento $i fallo, reintentando en 2s: $out"
+  sleep 2
+done &&
+for i in $(seq 1 30); do
+  cockroach sql --insecure --host=roach1 -e 'SELECT 1;' >/dev/null 2>&1 && break
+  echo "db-init: el cluster aun no acepta SQL (intento $i), reintentando en 2s"
+  sleep 2
+done &&
+cockroach sql --insecure --host=roach1 -f /scripts/init_db.sql && ...
+\end{lstlisting}
+
+\subsection{Verificación}
+Antes de subir el cambio se reprodujo el escenario de un entorno limpio en local, con una red y
+volúmenes de Docker completamente nuevos (sin reutilizar los datos ya inicializados del equipo),
+confirmando de punta a punta que el clúster se inicializaba correctamente sin intervención
+manual. La siguiente corrida real en GitHub Actions confirmó
+\texttt{roach1/roach2/roach3: Healthy} y el job \texttt{integration} avanzó más allá de este
+punto por primera vez en todo el proceso de depuración.
 

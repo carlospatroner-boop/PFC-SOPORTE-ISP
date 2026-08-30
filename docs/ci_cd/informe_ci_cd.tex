@@ -169,4 +169,40 @@ El resultado del siguiente run real: la falla \emph{seguía ocurriendo}, ahora d
 aproximadamente 3 minutos y 21 segundos en vez de 70 segundos. Aumentar el tiempo no cambió el
 resultado, solo lo retrasó -- la señal clara de que la causa no era de tiempo, sino estructural.
 
+\subsection{Diagnóstico con logs reales}
+Como ningún log de CockroachDB se había capturado nunca (el propio \texttt{docker compose up}
+fallaba y abortaba antes de llegar a un paso posterior que sí volcaba logs), se modificó el paso
+del workflow para volcar los logs de los 3 nodos ante cualquier falla:
+
+\begin{lstlisting}[language=bash,caption={Paso de diagnostico agregado al workflow}]
+docker compose up -d --build || {
+  echo "FALLO 'docker compose up' -- logs de los 3 nodos de CockroachDB:"
+  docker compose logs roach1 roach2 roach3
+  exit 1
+}
+\end{lstlisting}
+
+El siguiente run reveló, por fin, el mensaje real de CockroachDB en los 3 nodos:
+\texttt{"The server appears to be unable to contact the other nodes in the cluster... Node will
+now attempt to join a running cluster, or wait for \texttt{cockroach init}"}.
+
+\subsection{Causa raíz real}
+El healthcheck de los 3 nodos usaba \texttt{/health?ready=1} -- un endpoint de
+\emph{readiness} que en CockroachDB solo responde \texttt{OK} una vez que el nodo ya pertenece a
+un clúster \textbf{inicializado}. El servicio \texttt{db-init}, que es quien ejecuta
+\texttt{cockroach init} para inicializar ese clúster, tenía como condición
+\texttt{depends\_on: roach1/2/3: service\_healthy} -- es decir, esperaba a que los nodos
+estuvieran "listos" antes de poder inicializarlos.
+
+Candado circular real: nadie queda listo porque nadie los inicializa, y nadie los inicializa
+porque nadie queda listo. Ningún valor de \texttt{retries}/\texttt{start\_period}, por grande que
+fuera, podía resolver esto -- el candado nunca se abre por sí solo, sin importar cuánto tiempo se
+le dé.
+
+En las máquinas de desarrollo del equipo esto nunca se manifestó porque los volúmenes de Docker
+ya traían un clúster inicializado de sesiones de trabajo anteriores: los nodos arrancaban,
+encontraban su directorio de datos ya inicializado, y pasaban el healthcheck de inmediato. El
+runner de GitHub Actions, en cambio, arranca siempre desde un volumen completamente vacío, así
+que el candado se activa sin excepción, cien por ciento de las veces.
+
 

@@ -1,0 +1,433 @@
+\documentclass[11pt,letterpaper]{article}
+
+% ---------- Paquetes ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{float}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    citecolor=blue!50!black,
+    urlcolor=blue!50!black,
+    pdftitle={Informe CI/CD -- Equipo ACC},
+    pdfauthor={Carlos Carpio, Cristhian Pacheco, Robinson Cando, Jeremy Alvarez}
+}
+
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{codecomment}{RGB}{100,100,100}
+\definecolor{codekeyword}{RGB}{0,0,180}
+\definecolor{codestring}{RGB}{160,30,30}
+
+\lstdefinestyle{codigo}{
+    backgroundcolor=\color{codebg},
+    commentstyle=\color{codecomment}\itshape,
+    keywordstyle=\color{codekeyword}\bfseries,
+    stringstyle=\color{codestring},
+    basicstyle=\footnotesize\ttfamily,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    numberstyle=\tiny\color{codecomment},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{black!20}
+}
+\lstset{style=codigo}
+
+\title{\textbf{Informe CI/CD}\\
+\large Diagnóstico y corrección de fallas reales en el pipeline de integración continua\\
+\large Equipo ACC --- Aplicaciones Distribuidas (ISR-701)}
+
+\author{
+Carlos Jos\'e Carpio Mendoza \and
+Cristhian Daniel Pacheco C\'ardenas \and
+Robinson Rodrigo Cando Moreno \and
+Jeremy Alexis \'Alvarez P\'arraga\\[1em]
+\normalsize Equipo ACC\\
+\normalsize Facultad de Ciencias de la Computaci\'on\\
+\normalsize Universidad T\'ecnica Estatal de Quevedo
+}
+
+\date{Agosto 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent Este informe documenta la depuración real del job \texttt{integration} del pipeline
+de CI/CD (7 jobs), que fallaba de forma consistente en GitHub Actions pese a funcionar sin
+problema en las máquinas de desarrollo del equipo. Se describen, en el orden en que se
+descubrieron, tres causas raíz independientes -- todas confirmadas con evidencia real de logs,
+nunca supuestas -- incluyendo los intentos previos que \emph{no} resolvieron el problema, la
+corrección definitiva de cada una, y la verificación de punta a punta contra el stack real, hasta
+dejar los 7 jobs en verde sobre el mismo commit. Se documentan también los bugs secundarios
+encontrados en el propio proceso de verificar cada corrección, y las lecciones que deja el
+patrón común a los tres problemas.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Contexto}
+
+El equipo ACC mantiene un pipeline de integración continua en
+\texttt{.github/workflows/ci-cd.yml}, compuesto por 7 jobs encadenados mediante \texttt{needs:}
+para que cada etapa solo se ejecute si la anterior pasó:
+
+\begin{table}[H]
+\centering
+\caption{Los 7 jobs del pipeline}
+\begin{tabular}{@{}p{3.2cm}p{10.8cm}@{}}
+\toprule
+\textbf{Job} & \textbf{Qué hace} \\
+\midrule
+\texttt{lint} & Análisis estático de todos los subproyectos (backend, web, móvil). \\
+\texttt{test-backend} & Pruebas unitarias e integración de los microservicios Java, Node.js y
+Python. \\
+\texttt{test-web} & Pruebas unitarias y de contrato (Pact) de \texttt{apps/web}. \\
+\texttt{test-mobile} & Pruebas unitarias de \texttt{apps/mobile} (Kotlin/Jetpack Compose). \\
+\texttt{build-images} & Matriz de 7 destinos: construye y publica en GHCR la imagen Docker de
+cada microservicio y de \texttt{apps/web}. Solo publica en push, no en pull request. \\
+\texttt{build-mobile-apk} & Compila el APK de depuración de \texttt{apps/mobile} y lo publica
+como artefacto del pipeline. \\
+\texttt{integration} & Levanta el stack completo con \texttt{docker compose up -d --build} y
+corre contra él: verificación del proveedor del contrato Pact y la suite completa de Playwright
+E2E en 3 navegadores. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los primeros 6 jobs pasaban de forma consistente. El séptimo, \texttt{integration}, fallaba en
+\emph{todas} las corridas sobre GitHub Actions, mientras que el mismo
+\texttt{docker compose up -d --build} que ese job ejecuta funcionaba sin problema en las máquinas
+de desarrollo del equipo. Esa asimetría -- funciona en local, falla siempre en el runner -- fue
+la pista central: el problema no era una falla puntual ni un error de sintaxis, sino una
+diferencia estructural entre ambos entornos que el equipo tuvo que identificar con precisión, no
+adivinar.
+
+\subsection{Metodología de diagnóstico}
+
+El primer obstáculo fue de \emph{visibilidad}, no de código: la API pública de GitHub
+(\texttt{checks-runs/.../annotations}) solo devuelve mensajes genéricos del tipo
+\texttt{"Process completed with exit code 1"}, sin el log real del comando que falló, y
+descargar el log completo de un run sin autenticación devuelve \texttt{403 Must have admin
+rights}. Con solo esa API, cada intento de arreglo era en el fondo una conjetura educada sobre
+qué pudo haber fallado.
+
+El equipo instaló y autenticó la CLI oficial de GitHub (\texttt{gh}), que sí da acceso al log
+completo de cada paso individual del job (\texttt{gh run view <id> --log-failed}). Este cambio
+de herramienta fue lo que permitió pasar de "adivinar la causa y esperar a ver si el siguiente
+run pasa" a "leer el error real, confirmarlo, y recién entonces corregirlo" -- el patrón que
+se repite en los tres problemas de este informe. En Windows, la instalación de \texttt{gh} vía
+\texttt{winget} presentó además una complicación menor: el \texttt{PATH} actualizado no era
+visible para sesiones de terminal ya abiertas, lo que obligó a invocar el binario por su ruta
+absoluta hasta abrir una sesión nueva.
+
+\section{Problema 1: candado circular en el healthcheck de CockroachDB}
+
+\subsection{Síntoma inicial}
+El paso \texttt{docker compose up -d --build} fallaba con
+\texttt{dependency failed to start: container roach1 is unhealthy}, después de aproximadamente
+70 segundos de espera.
+
+\subsection{Primer intento: aumentar el presupuesto de tiempo (insuficiente)}
+La hipótesis inicial, razonable dado que un runner compartido de GitHub Actions tiene menos CPU
+disponible que una máquina de desarrollo dedicada, fue que CockroachDB simplemente necesitaba más
+tiempo para formar el clúster bajo contención de recursos. Se subió el presupuesto del
+healthcheck:
+
+\begin{lstlisting}[language=yaml,caption={Primer intento: mas tiempo, no resolvio el problema}]
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:8080/health?ready=1"]
+  interval: 10s
+  timeout: 5s
+  retries: 15        # antes: 5
+  start_period: 60s   # antes: 20s
+\end{lstlisting}
+
+El resultado del siguiente run real: la falla \emph{seguía ocurriendo}, ahora después de
+aproximadamente 3 minutos y 21 segundos en vez de 70 segundos. Aumentar el tiempo no cambió el
+resultado, solo lo retrasó -- la señal clara de que la causa no era de tiempo, sino estructural.
+
+\subsection{Diagnóstico con logs reales}
+Como ningún log de CockroachDB se había capturado nunca (el propio \texttt{docker compose up}
+fallaba y abortaba antes de llegar a un paso posterior que sí volcaba logs), se modificó el paso
+del workflow para volcar los logs de los 3 nodos ante cualquier falla:
+
+\begin{lstlisting}[language=bash,caption={Paso de diagnostico agregado al workflow}]
+docker compose up -d --build || {
+  echo "FALLO 'docker compose up' -- logs de los 3 nodos de CockroachDB:"
+  docker compose logs roach1 roach2 roach3
+  exit 1
+}
+\end{lstlisting}
+
+El siguiente run reveló, por fin, el mensaje real de CockroachDB en los 3 nodos:
+\texttt{"The server appears to be unable to contact the other nodes in the cluster... Node will
+now attempt to join a running cluster, or wait for \texttt{cockroach init}"}.
+
+\subsection{Causa raíz real}
+El healthcheck de los 3 nodos usaba \texttt{/health?ready=1} -- un endpoint de
+\emph{readiness} que en CockroachDB solo responde \texttt{OK} una vez que el nodo ya pertenece a
+un clúster \textbf{inicializado}. El servicio \texttt{db-init}, que es quien ejecuta
+\texttt{cockroach init} para inicializar ese clúster, tenía como condición
+\texttt{depends\_on: roach1/2/3: service\_healthy} -- es decir, esperaba a que los nodos
+estuvieran "listos" antes de poder inicializarlos.
+
+Candado circular real: nadie queda listo porque nadie los inicializa, y nadie los inicializa
+porque nadie queda listo. Ningún valor de \texttt{retries}/\texttt{start\_period}, por grande que
+fuera, podía resolver esto -- el candado nunca se abre por sí solo, sin importar cuánto tiempo se
+le dé.
+
+En las máquinas de desarrollo del equipo esto nunca se manifestó porque los volúmenes de Docker
+ya traían un clúster inicializado de sesiones de trabajo anteriores: los nodos arrancaban,
+encontraban su directorio de datos ya inicializado, y pasaban el healthcheck de inmediato. El
+runner de GitHub Actions, en cambio, arranca siempre desde un volumen completamente vacío, así
+que el candado se activa sin excepción, cien por ciento de las veces.
+
+\subsection{Solución definitiva}
+\begin{itemize}[leftmargin=1.2em]
+  \item Los 3 healthchecks se cambiaron a \texttt{/health} (sin \texttt{?ready=1}) -- verifica
+  solo que el proceso está vivo (\emph{liveness}), no que el clúster ya esté inicializado. Esto
+  desbloquea a \texttt{db-init} para que pueda arrancar y ejecutar \texttt{cockroach init}.
+  \item Se agregó un bucle de reintentos alrededor de \texttt{cockroach init} (hasta 30 intentos,
+  2 s entre cada uno) y una segunda espera activa a que el clúster acepte conexiones SQL antes de
+  correr los scripts de esquema, para cerrar una carrera residual pequeña entre "el nodo terminó
+  de inicializarse" y "el nodo ya acepta SQL real".
+\end{itemize}
+
+\begin{lstlisting}[language=bash,caption={Extracto del entrypoint corregido de db-init}]
+for i in $(seq 1 30); do
+  out=$(cockroach init --insecure --host=roach1 2>&1) && break
+  echo "$out" | grep -qi 'already been initialized' && break
+  echo "db-init: intento $i fallo, reintentando en 2s: $out"
+  sleep 2
+done &&
+for i in $(seq 1 30); do
+  cockroach sql --insecure --host=roach1 -e 'SELECT 1;' >/dev/null 2>&1 && break
+  echo "db-init: el cluster aun no acepta SQL (intento $i), reintentando en 2s"
+  sleep 2
+done &&
+cockroach sql --insecure --host=roach1 -f /scripts/init_db.sql && ...
+\end{lstlisting}
+
+\subsection{Verificación}
+Antes de subir el cambio se reprodujo el escenario de un entorno limpio en local, con una red y
+volúmenes de Docker completamente nuevos (sin reutilizar los datos ya inicializados del equipo),
+confirmando de punta a punta que el clúster se inicializaba correctamente sin intervención
+manual. La siguiente corrida real en GitHub Actions confirmó
+\texttt{roach1/roach2/roach3: Healthy} y el job \texttt{integration} avanzó más allá de este
+punto por primera vez en todo el proceso de depuración.
+
+\section{Problema 2: datos de demo faltantes en el contrato Pact}
+
+\subsection{Síntoma}
+Resuelto el problema anterior, el job avanzó considerablemente más lejos -- hasta la
+verificación del lado proveedor del contrato Pact, penúltimo paso del job -- y ahí falló con:
+
+\begin{lstlisting}[caption={Fallo real de la verificacion del contrato}]
+1) Verifying a pact between soporte-web and ticket-service - una peticion GET
+   de la lista de tickets, sin filtros, con un JWT valido de ADMIN has a
+   matching body
+
+   1.1) body: $.data Variant at index 0 ({"ticketId":"c8e57689-...",
+        "status":"RESUELTO", ...}) was not found in the actual list
+\end{lstlisting}
+
+El ticket que el contrato esperaba encontrar en la respuesta real de \texttt{ticket-service}
+simplemente no existía en la base de datos.
+
+\subsection{Investigación}
+El método \texttt{@State} de la prueba (\texttt{TicketServiceProviderPactTest}) era, hasta ese
+momento, un no-op a propósito, con un comentario explícito que decía que el stack "ya tiene datos
+de demo con tickets visibles para ADMIN", citando un script,
+\texttt{resultados/rebalance\_demo\_tickets.sql}, como la fuente de esos datos. Se buscó ese
+archivo en el repositorio completo, incluyendo todo el historial de commits, y se confirmó que
+\textbf{nunca se llegó a versionar en git} -- no existe ni existió jamás en ningún commit. Solo
+había existido, de forma manual y nunca documentada como tal, en el volumen de Docker de la
+persona que lo escribió originalmente en su propia máquina.
+
+Es exactamente el mismo patrón de fondo que el Problema 1: la máquina de desarrollo
+"funcionaba" solo porque conservaba un estado acumulado que un entorno realmente limpio nunca
+podría reproducir por su cuenta.
+
+\subsection{Solución}
+Se reescribió el método \texttt{@State} para que inserte, por SQL directo, exactamente los dos
+tickets que el archivo de contrato (\texttt{pacts/soporte-web-ticket-service.json}) necesita --
+es precisamente para eso que existe el mecanismo \texttt{@State} de Pact: que la propia prueba
+garantice su precondición de forma explícita y reproducible, en vez de depender de un dato
+externo invisible que nadie versionó.
+
+\begin{lstlisting}[language=Java,caption={Extracto del @State corregido}]
+@State("el rol ADMIN tiene al menos un ticket visible")
+void elRolAdminTieneAlMenosUnTicketVisible() throws Exception {
+    try (Connection conn = DriverManager.getConnection(
+            "jdbc:postgresql://localhost:26257/ticket_db?sslmode=disable",
+            "root", "")) {
+        // ... inserta por SQL directo exactamente los tickets que el
+        // archivo de contrato espera encontrar.
+    }
+}
+\end{lstlisting}
+
+\subsection{Bug adicional encontrado durante la verificación: \texttt{UPSERT} vs. índice único}
+Al probar esta corrección contra el stack real (no simulada) se encontró un segundo bug, más
+pequeño pero real: el primer intento usó \texttt{UPSERT INTO} para insertar los tickets, y falló
+con \texttt{duplicate key value violates unique constraint "tickets\_id\_key"}.
+
+La causa: \texttt{UPSERT} en CockroachDB solo resuelve conflictos contra la \emph{primary key}
+compuesta de la tabla (\texttt{created\_at}, \texttt{id}); la tabla \texttt{tickets} tiene además
+un índice único \emph{aparte} sobre \texttt{id} en solitario (\texttt{tickets\_id\_key}, agregado
+para que las búsquedas por id no tengan que escanear las 4 particiones). Como esos tickets de
+demo ya existían de pruebas manuales anteriores en el mismo stack, con un valor distinto de
+\texttt{created\_at}, el \texttt{UPSERT} no los reconoció como el mismo registro y chocó contra
+ese índice en vez de actualizar la fila.
+
+\begin{lstlisting}[language=SQL,caption={Reemplazo de UPSERT por DELETE + INSERT}]
+-- Antes (fallaba si el ticket ya existia con otro created_at):
+UPSERT INTO tickets (created_at, id, ...) VALUES (?, ?, ...)
+
+-- Despues (idempotente sin importar el estado previo de la tabla):
+DELETE FROM tickets WHERE id = ?;
+INSERT INTO tickets (created_at, id, ...) VALUES (?, ?, ...);
+\end{lstlisting}
+
+\subsection{Verificación}
+Se corrió la prueba dos veces seguidas contra el stack real con Maven real (no una ejecución
+simulada): la primera corrida expuso el bug del \texttt{UPSERT} en vivo, con el error real de
+CockroachDB; tras aplicar el fix, ambas corridas pasaron 2/2 de forma consistente, confirmando
+la idempotencia real del mecanismo sin importar si los tickets ya existían de una corrida
+anterior.
+
+\section{Problema 3: Playwright solo instalaba Chromium}
+
+\subsection{Síntoma}
+Con los dos problemas anteriores resueltos, el job llegó por primera vez hasta las pruebas E2E de
+Playwright. Los 3 casos de Chromium pasaron:
+
+\begin{lstlisting}[caption={Chromium paso, Firefox y WebKit fallaron de inmediato}]
+  ok 1 [chromium] un ADMIN inicia sesion y ve la consola con tickets reales
+  ok 2 [chromium] abrir un ticket muestra su detalle completo
+  ok 3 [chromium] credenciales invalidas muestran un error real del backend
+
+  1) [firefox] un ADMIN inicia sesion...
+     Error: browserType.launch: Executable doesn't exist at
+     /home/runner/.cache/ms-playwright/firefox-1538/firefox/firefox
+\end{lstlisting}
+
+Firefox y WebKit fallaban de inmediato, sin siquiera llegar a intentar abrir una página --
+el navegador simplemente no estaba instalado en el runner.
+
+\subsection{Causa raíz}
+\texttt{playwright.config.ts} define 3 proyectos (\texttt{chromium}, \texttt{firefox},
+\texttt{webkit} -- requisito de "Compatibilidad" de la rúbrica de Entrega 4: la web debe
+funcionar en Chrome, Firefox y Safari, usando WebKit como el mismo motor de renderizado que usa
+Safari). El paso de instalación del workflow, sin embargo, decía:
+
+\begin{lstlisting}[language=bash,caption={Paso de instalacion original, restringido a un solo navegador}]
+npx playwright install --with-deps chromium
+\end{lstlisting}
+
+El argumento \texttt{chromium} restringía la instalación a un solo navegador de los tres que la
+configuración realmente usa -- una desconexión simple entre lo que el \texttt{.yml} del pipeline
+instalaba y lo que el propio \texttt{playwright.config.ts} del proyecto exigía.
+
+\subsection{Solución}
+\begin{lstlisting}[language=bash,caption={Correccion: sin argumento, instala los navegadores que la config usa}]
+npx playwright install --with-deps
+\end{lstlisting}
+
+\subsection{Verificación}
+Se instalaron los 3 navegadores en local (confirmando la presencia real de los binarios de
+\texttt{firefox} y \texttt{webkit} en la caché de Playwright) y se corrieron las 9 pruebas E2E
+completas contra el stack real levantado, confirmando que ningún caso volvía a fallar con el
+error de ejecutable faltante, en ningún navegador, antes de subir el cambio.
+
+
+\section{Resultado}
+
+Con los tres cambios integrados en commits sucesivos sobre la misma rama, el pipeline completo --
+los 7 jobs, incluidos los 7 destinos de la matriz de \texttt{build-images} y
+\texttt{build-mobile-apk} -- quedó en verde sobre un mismo commit, cumpliendo el requisito de la
+rúbrica de que los 7 jobs pasen juntos en el último commit de la entrega.
+
+\begin{table}[H]
+\centering
+\caption{Resumen de las tres causas raíz encontradas y corregidas}
+\begin{tabular}{@{}p{2.6cm}p{4.6cm}p{4.4cm}p{2.6cm}@{}}
+\toprule
+\textbf{Problema} & \textbf{Causa raíz} & \textbf{Corrección} & \textbf{Intento previo fallido} \\
+\midrule
+Healthcheck de CockroachDB & Candado circular: \texttt{?ready=1} exige clúster ya inicializado,
+pero quien inicializa espera a ese mismo healthcheck & \texttt{/health} (liveness) + reintentos
+de \texttt{cockroach init} + espera activa a SQL & Aumentar \texttt{retries}/
+\texttt{start\_period} -- solo retrasó la falla \\
+\addlinespace
+Contrato Pact & Datos de demo asumidos como ya existentes, en un script nunca versionado en git &
+El propio \texttt{@State} inserta los datos por SQL (\texttt{DELETE}+\texttt{INSERT}) &
+\texttt{UPSERT} -- chocó contra un índice único aparte \\
+\addlinespace
+Playwright E2E & Paso de instalación restringido a un solo navegador (\texttt{chromium}) &
+Instalar los 3 navegadores que la configuración define & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Amenazas a la validez}
+
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Un solo entorno de runner observado.} Todas las corridas se hicieron sobre los
+  runners \texttt{ubuntu-latest} compartidos de GitHub Actions; no se probó el pipeline en otro
+  proveedor de CI, así que no se puede afirmar que estas sean las únicas causas posibles de falla
+  en un entorno "limpio" en general, solo que lo fueron en el entorno real usado por el equipo.
+  \item \textbf{El primer intento del Problema 1 no se descartó por análisis, sino por
+  observación.} Aumentar el presupuesto de tiempo era una hipótesis razonable a priori; se supo
+  que era insuficiente solo después de ver el resultado del siguiente run real, no por haber
+  anticipado el candado circular de antemano. Esto es consistente con la metodología descrita
+  (diagnosticar con logs reales antes de dar un fix por bueno), pero vale dejarlo explícito.
+  \item \textbf{La verificación de idempotencia del Problema 2 se hizo con 2 corridas, no más.}
+  Es suficiente para confirmar que el bug del \texttt{UPSERT} se corrigió, pero no constituye una
+  prueba exhaustiva de que no exista alguna otra condición de carrera no observada en ese punto.
+\end{itemize}
+
+\section{Conclusiones}
+
+Los tres problemas comparten un mismo patrón de fondo: algo que \emph{parecía} funcionar porque
+la máquina de desarrollo del equipo conservaba un estado acumulado -- un volumen ya inicializado,
+datos de demo cargados a mano, o simplemente un navegador ya instalado de una sesión anterior --
+que un entorno realmente limpio, como el de un runner de GitHub Actions, nunca reproduce por su
+cuenta. Ninguno de los tres era un problema de "CI/CD mal configurado" en abstracto: cada uno
+tenía una causa raíz concreta y verificable con el log real del paso que fallaba, y cada
+corrección -- incluidos los dos bugs secundarios encontrados en el propio proceso de verificar
+las correcciones principales -- se probó de punta a punta contra el stack real, nunca simulada,
+antes de darla por buena.
+
+Una lección práctica adicional: el primer intento de arreglar el Problema 1 (aumentar tiempos de
+espera) fue una hipótesis razonable que resultó incorrecta, y solo se supo que era incorrecta
+observando el resultado real del siguiente run, no por haberla anticipado de antemano. Aumentar
+un timeout es, en general, un cambio de bajo riesgo y fácil de justificar -- pero cuando la causa
+real es estructural (un candado circular, en este caso), ningún valor de tiempo, por grande que
+sea, lo resuelve. La señal de que había que seguir buscando no fue que el fix "no funcionara" en
+abstracto, sino que el mismo síntoma reapareciera después de más tiempo en vez de desaparecer.
+
+\end{document}

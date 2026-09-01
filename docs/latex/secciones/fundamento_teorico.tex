@@ -124,3 +124,70 @@ pareados, la prueba de rangos con signo de Wilcoxon. El intervalo de confianza a
 nivel se calcula como $\bar{t} \pm 1.96 \cdot s/\sqrt{r}$, válido asintóticamente por el teorema
 central del límite para $r \geq 8$ muestras por nivel tras el descarte de calentamiento y
 enfriamiento descrito en la Sección~\ref{sec:protocolo-resultados}.
+
+\bigskip
+\noindent
+Los fundamentos anteriores sostienen la capa de datos distribuida heredada de las Entregas 2 y 3.
+La Entrega 4 añade sobre ella dos canales de acceso, un pipeline de integración continua y un
+protocolo de calidad de producto, cuyo fundamento se desarrolla a continuación.
+\label{sec:fundamento-e4}
+
+\subsection{Arquitectura en capas y principios SOLID}
+
+La arquitectura en capas separa un sistema en presentación, aplicación, dominio e
+infraestructura~\cite{martin2017clean,evans2003ddd}, con una regla de dependencia única: el
+código de una capa solo puede depender de capas más internas, nunca al revés —el dominio no
+conoce ni la base de datos ni el protocolo de transporte que lo expone. Los principios SOLID son
+las restricciones que impiden que esa separación se erosione con el tiempo: responsabilidad
+única (una clase, un motivo de cambio), abierto/cerrado (extensible sin modificar código
+existente), sustitución de Liskov (una subclase debe poder reemplazar a su clase base sin alterar
+la corrección del programa), segregación de interfaces (interfaces pequeñas y específicas en vez
+de una interfaz general que fuerza a implementar métodos irrelevantes), e inversión de
+dependencias (los módulos de alto nivel no dependen de los de bajo nivel; ambos dependen de
+abstracciones). El uso disciplinado de estos principios es prerrequisito para que los patrones de
+diseño del catálogo de Gamma et al.~\cite{gamma1994patterns} aporten valor real, en vez de ser
+indirección sin propósito.
+
+\subsection{Ingeniería de aplicaciones móviles}
+
+Las aplicaciones móviles enfrentan retos particulares frente al desarrollo de escritorio o web:
+heterogeneidad de dispositivos, restricciones de batería y de red intermitente, un ciclo de vida
+gestionado por el sistema operativo (no por el proceso de la propia aplicación), y ventanas de
+publicación controladas por tiendas de aplicaciones~\cite{wasserman2010mobile}. La decisión entre
+desarrollo nativo y multiplataforma no es una preferencia estética: tiene consecuencias medibles
+en rendimiento, mantenibilidad y \emph{time-to-market}, documentadas empíricamente en la
+literatura de ingeniería de software móvil~\cite{elkassas2017taxonomy,biornhansen2019crossplatform}.
+La Sección~\ref{sec:movil} aplica dos de esos criterios cuantitativos —tamaño de artefacto y
+dependencias de interoperabilidad— directamente sobre el proyecto construido, en vez de citarlos
+solo como referencia teórica.
+
+\subsection{Integración y entrega continuas}
+
+La entrega continua se apoya en un \emph{pipeline} automatizado que ejecuta pruebas, empaqueta y
+despliega en ambientes segregados~\cite{humble2010continuous}. La cultura DevOps subyacente
+exige que ningún cambio llegue a un artefacto publicado sin pasar por los mismos
+controles~\cite{kim2021devops}: en este proyecto, el pipeline de GitHub Actions
+(Sección~\ref{sec:pruebas-cicd}) actúa como \emph{quality gate} explícito mediante dependencias
+declaradas entre \emph{jobs} —si la integración falla, el despliegue de imágenes no ocurre.
+
+\subsection{Observabilidad distribuida}
+
+La observabilidad de un sistema distribuido se sustenta en tres señales: métricas (agregados
+numéricos con etiquetas), registros estructurados, y trazas (secuencias de \emph{spans}
+correlacionados por un identificador común)~\cite{sigelman2010dapper,beyer2016sre}. El estándar
+OpenTelemetry~\cite{opentelemetry2024spec} unifica su modelo de datos y su exportación,
+permitiendo que distintos proveedores de \emph{backend} de observabilidad (en este proyecto,
+Grafana Tempo para trazas y Prometheus para métricas) consuman las mismas señales sin
+instrumentación duplicada por proveedor.
+
+\subsection{Modelo de calidad ISO/IEC 25010:2023}
+
+El modelo ISO/IEC 25010:2023~\cite{iso25010} organiza la calidad de producto de software en ocho
+características —adecuación funcional, eficiencia de desempeño, compatibilidad, usabilidad,
+fiabilidad, seguridad, mantenibilidad y portabilidad—, cada una descompuesta en
+subcaracterísticas y evaluable mediante métricas objetivas. Frente a un modelo de calidad
+puramente cualitativo, esta estructura obliga a declarar de antemano un umbral numérico por
+característica y a reportar la desviación respecto a ese umbral cuando ocurre, en vez de una
+valoración subjetiva de si el sistema ``es de buena calidad''. La Sección~\ref{sec:iso25010}
+aplica cinco de las ocho características a este proyecto, siguiendo esa misma disciplina de
+declarar el umbral antes de medir.

@@ -3,9 +3,10 @@
 Proyecto Fin de Curso — Aplicaciones Distribuidas (ISR-701), Universidad Técnica Estatal de
 Quevedo, Facultad de Ciencias de la Computación.
 
-Sistema distribuido de gestión de tickets de soporte técnico para un ISP, construido como una
-arquitectura de microservicios con persistencia distribuida real (CockroachDB), mensajería
-asíncrona (Kafka) y un pipeline analítico paralelo (Apache Spark).
+Sistema distribuido de gestión de tickets de soporte técnico para un ISP: dos aplicaciones
+cliente (web y móvil) que consumen la misma API a través de un único API Gateway, seis
+microservicios, persistencia distribuida real (CockroachDB), mensajería asíncrona (Kafka),
+observabilidad completa (métricas + logs + trazas) y un pipeline de CI/CD de 7 jobs.
 
 > ⚠️ **Importante — fecha límite de entrega indicada por el docente:** los commits para la
 > actividad **GA-SUM-06 / PE-U5 - CI/CD, Pruebas y Observabilidad** se pueden realizar y subir
@@ -13,104 +14,137 @@ asíncrona (Kafka) y un pipeline analítico paralelo (Apache Spark).
 
 ## Arquitectura
 
-| Microservicio | Puerto | Stack | Responsabilidad |
+Todo el tráfico de los clientes pasa por un único punto de entrada:
+
+```
+apps/web (React) ──┐
+                     ├──▶ api-gateway (8000) ──▶ microservicios ──▶ CockroachDB / Kafka / MongoDB
+apps/mobile (Kotlin)┘
+```
+
+| Componente | Puerto | Stack | Responsabilidad |
 |---|---|---|---|
+| `apps/web` | 5173 | React 18 + TypeScript + Vite | Consola de operadores/clientes (SPA) |
+| `apps/mobile` | — (APK) | Kotlin + Jetpack Compose | Cliente de campo para técnicos |
+| `api-gateway` | 8000 | Spring Cloud Gateway | Único punto de entrada, enrutamiento por prefijo |
 | `auth-service` | 8001 | Java 21 + Spring Boot | Autenticación JWT, RBAC (CLIENTE/TECNICO/ADMIN) |
-| `ticket-service` (`svc-principal`) | 8002 | Java 21 + Spring Boot + CockroachDB | CRUD de tickets, orquesta la saga por Kafka |
+| `ticket-service` (`svc-principal`) | 8002 | Java 21 + Spring Boot + CockroachDB | CRUD de tickets, arquitectura hexagonal, 6 patrones GoF |
 | `notification-service` | 8003 | Node.js + Express + MongoDB | Notificaciones multicanal (simuladas) |
 | `ai-service` | 8004 | Python + FastAPI + MongoDB | Clasificación asíncrona de tickets (basada en reglas) |
 | `report-service` | 8005 | Java 21 + Spring Boot + CockroachDB | Modelo de lectura CQRS, reportes, exportación CSV |
 
-Más: cluster CockroachDB de 3 nodos (`db-cluster/`), Kafka + MongoDB (`messaging/`), pipeline de
-Spark (`spark/`) y un frontend estático (`frontend/`).
+Más: cluster CockroachDB de 3 nodos, Kafka + MongoDB para la saga por coreografía, y una pila de
+observabilidad completa (OpenTelemetry Collector, Tempo, Prometheus, Grafana, cAdvisor).
 
-## Cómo levantar todo (Windows)
+Ver [`docs/diagrams/`](docs/diagrams/) para los diagramas C4 completos y
+[`docs/adr/`](docs/adr/) para las decisiones de arquitectura documentadas.
+
+## Cómo levantar todo desde cero
+
+Todo el stack (17 contenedores) se levanta con un único `docker-compose.yml` en la raíz del
+repositorio — sin pasos manuales de inicialización de base de datos, sin compose files sueltos
+por carpeta:
+
+```bash
+docker compose up -d --build
+```
+
+Esto levanta, en orden de dependencias:
+
+1. **Cluster CockroachDB** (`roach1`/`roach2`/`roach3`) + `db-init` (un contenedor de un solo uso
+   que crea las bases de datos y ejecuta las semillas — determinista, seguro de correr más de una vez).
+2. **Kafka + MongoDB** para la saga por coreografía entre `ticket-service`, `ai-service`,
+   `notification-service` y `report-service`.
+3. Los **6 microservicios** y `api-gateway`.
+4. **`apps/web`** servida por nginx en `http://localhost:5173`.
+5. **Observabilidad**: OpenTelemetry Collector, Tempo, Prometheus, cAdvisor y Grafana.
+
+En Windows, `start-all.ps1` hace lo mismo con verificaciones adicionales (espera a que cada
+servicio esté realmente saludable antes de continuar, corrige el reloj de la VM de Docker
+Desktop si detecta desfase — ver `scripts/clock_watchdog.sh`).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File start-all.ps1
 ```
 
-Levanta el cluster CockroachDB, Kafka/MongoDB, y los 5 microservicios, y deja el frontend servido
-en `http://localhost:5500/auth/index.html`. Es seguro volver a correrlo si algo quedó a medias
-(los pasos de base de datos usan `IF NOT EXISTS`).
-
-Cuentas de prueba creadas automáticamente:
+### Cuentas de prueba (creadas automáticamente por `db-init`)
 
 | Rol | Correo | Contraseña |
 |---|---|---|
 | ADMIN | `admin@soporte.local` | `Admin123!` |
 | CLIENTE | `cliente@test.com` | `Passw0rd!` |
 
-Para levantar cada pieza a mano (otros sistemas operativos, o depuración), ver el README de cada
-carpeta: [`db-cluster/README.md`](db-cluster/README.md), [`services/auth-service/README.md`](services/auth-service/README.md),
-[`services/svc-principal/README.md`](services/svc-principal/README.md),
-[`services/notification-service/README.md`](services/notification-service/README.md),
-[`services/ai-service/README.md`](services/ai-service/README.md),
-[`services/report-service/README.md`](services/report-service/README.md),
-[`spark/README.md`](spark/README.md), [`frontend/README.md`](frontend/README.md).
+### Accesos una vez levantado
+
+| Servicio | URL |
+|---|---|
+| Aplicación web | http://localhost:5173 |
+| API (a través del gateway) | http://localhost:8000/api/v1/... |
+| Grafana (dashboard operativo) | http://localhost:3000 (sin login, acceso anónimo de solo lectura) |
+| Prometheus | http://localhost:9090 |
+| Tempo (trazas, vía API) | http://localhost:3200 |
+
+### Aplicación móvil
+
+```bash
+cd apps/mobile
+./gradlew assembleDebug
+# APK en apps/mobile/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Requiere que `api-gateway` sea alcanzable desde el emulador/dispositivo — por defecto apunta a
+`10.0.2.2:8000` (el alias que usa el emulador de Android para "localhost" de la máquina host).
 
 ## Variables de entorno
 
-Ver [`.env.example`](.env.example) — cada servicio ya trae un valor por defecto para correr en
-localhost sin configurar nada.
+Ver [`.env.example`](.env.example). El `docker-compose.yml` no requiere ningún `.env` para
+levantarse (todos los valores traen un default funcional para desarrollo local); el archivo
+documenta qué se puede sobreescribir si se corre algún servicio suelto, fuera de Docker.
 
-## Novedades de la Entrega 3
+## Pruebas
 
-- **Fragmentación horizontal de `tickets` por `fecha_apertura`** (`PARTITION BY RANGE`, 4
-  particiones trimestrales) con replicación factor 3 — ver [`docs/adr/0003-sharding-policy.md`](docs/adr/0003-sharding-policy.md).
-- **Pruebas de integración con Testcontainers** contra un CockroachDB real, incluida una prueba
-  empírica de aislamiento serializable — `services/svc-principal/src/test/.../integration/`.
-- **Métricas Prometheus incrementales** (`crdb_query_duration_seconds`,
-  `crdb_transaction_retries_total`, `crdb_pool_active_connections`) en `/actuator/prometheus` de
-  `ticket-service`.
-- **Pipeline Apache Spark** (`spark/`): 5 transformaciones (filtrado, join colocalizado por
-  `client_id`, ventana de reincidencia, tipos temporales, clustering ML por texto y zona) sobre un
-  dataset sintético de ≥500,000 filas, con baseline secuencial en pandas para comparación
-  (`spark/src/pipeline.py`, `spark/src/baseline.py`).
-- **Protocolo experimental** (r=10 repeticiones, IC 95%, contraste estadístico) — ver
-  [`docs/experimentos/protocolo.md`](docs/experimentos/protocolo.md).
-- **Verificación de tolerancia a fallos** del cluster CockroachDB — ver
-  [`db-cluster/README.md`](db-cluster/README.md) y `docs/evidencias/`.
+| Capa | Comando | Dónde |
+|---|---|---|
+| Unitarias backend (Java) | `mvn test` | `services/auth-service`, `services/svc-principal`, `services/report-service` |
+| Unitarias backend (Node) | `npm test` | `services/notification-service` |
+| Unitarias backend (Python) | `pytest tests/ -v` | `services/ai-service` |
+| Cobertura (JaCoCo) | `mvn test -Pcoverage` | `services/svc-principal` (reporte en `target/site/jacoco/`) |
+| Componente + contrato Pact (web) | `npm test` | `apps/web` |
+| Contrato Pact (proveedor) | `mvn test -Dtest=TicketServiceProviderPactTest -DRUN_CONTRACT_VERIFICATION=true` | `services/svc-principal` (requiere el stack completo levantado) |
+| E2E (Chromium/Firefox/WebKit) | `npx playwright test` | `apps/web` |
+| Unitarias móvil | `./gradlew testDebugUnitTest` | `apps/mobile` |
+| Instrumentadas móvil (Compose Testing) | `./gradlew connectedDebugAndroidTest` | `apps/mobile` (requiere emulador/dispositivo) |
+| Carga | `locust -f tests/load/locustfile.py --host http://localhost:8000` | raíz del repo |
 
-## Tests
-
-Cada microservicio Java tiene sus propios tests unitarios y de integración (`mvn test`); los
-servicios de Node.js y Python usan `node --test` / `pytest` respectivamente. Ver el README de
-cada servicio para el comando exacto.
+Pipeline completo de CI/CD (7 jobs: lint, test-backend, test-web, test-mobile, build-images,
+build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml).
 
 ## Documentación
 
 - Decisiones de arquitectura: [`docs/adr/`](docs/adr/)
-- Diagramas: [`docs/diagrams/`](docs/diagrams/)
-- Documento LaTeX de la Entrega 3: [`docs/latex/`](docs/latex/)
-- Protocolo experimental y resultados: [`docs/experimentos/`](docs/experimentos/)
+- Diagramas C4: [`docs/diagrams/`](docs/diagrams/)
+- Manuscrito LaTeX (acumulado E1-E4): [`docs/latex/`](docs/latex/)
+- Protocolo y resultados experimentales (Spark, Entrega 3): [`docs/experimentos/protocolo.md`](docs/experimentos/protocolo.md)
+- Evaluación experimental ISO/IEC 25010 (Entrega 4): [`docs/experimentos/evaluacion_iso25010.md`](docs/experimentos/evaluacion_iso25010.md)
 - Evidencia de tolerancia a fallos: `docs/evidencias/`
 - Declaración de uso de IA: [`ai-usage-declaration.md`](ai-usage-declaration.md)
 
-## Diapositivas de la defensa (Entrega 3)
+## Novedades de la Entrega 4
 
-Mazo de la defensa oral en [`docs/diapositivas/`](docs/diapositivas/):
-`EXPO-E3_ACC_Carpio-Pacheco-Cando-Alvarez.pptx` (fuente editable) y su exportación
-`EXPO-E3_ACC_Carpio-Pacheco-Cando-Alvarez.pdf` (entregable, ambos deben coincidir).
-
-El `.pptx` se genera con un script Python (`python-pptx`), no se edita a mano, para poder
-regenerarlo de forma determinista si cambia algún dato (por ejemplo, tras ejecutar el protocolo
-experimental o el video de tolerancia a fallos pendientes). Para reproducirlo:
-
-```bash
-pip install python-pptx matplotlib pillow
-python docs/diapositivas/build_deck.py
-```
-
-Esto regenera `docs/diapositivas/EXPO-E3_ACC_Carpio-Pacheco-Cando-Alvarez.pptx` a partir de las
-imágenes ya versionadas en `docs/diagrams/` y `spark/results/`. Para exportar el PDF a partir del
-`.pptx` (usado aquí para no depender de una instalación local de LibreOffice):
-
-```bash
-docker run --rm -v "${PWD}/docs/diapositivas:/work" -w /work debian:bookworm-slim sh -c \
-  "apt-get update -qq && apt-get install -y --no-install-recommends libreoffice-impress && \
-   soffice --headless --convert-to pdf EXPO-E3_ACC_Carpio-Pacheco-Cando-Alvarez.pptx"
-```
+- **Refactor a arquitectura hexagonal** de `ticket-service` en 4 capas (presentación/aplicación/
+  dominio/infraestructura) con 6 patrones GoF reales — ver [`docs/adr/0005-patrones-gof.md`](docs/adr/0005-patrones-gof.md).
+- **Aplicación web** (`apps/web`, React + TypeScript) y **aplicación móvil** (`apps/mobile`,
+  Kotlin + Jetpack Compose) — ver [`docs/adr/0006-eleccion-movil.md`](docs/adr/0006-eleccion-movil.md)
+  para la justificación cuantitativa de Android nativo.
+- **`api-gateway`**: único punto de entrada para ambos clientes.
+- **Observabilidad completa**: métricas, logs JSON estructurados con `trace_id`, trazas
+  distribuidas (OpenTelemetry), dashboard operativo en Grafana.
+- **Pirámide de pruebas completa**: unitarias, integración (Testcontainers), contrato
+  (Pact consumidor + proveedor), E2E (Playwright en 3 navegadores, Compose Testing en móvil),
+  carga (Locust).
+- **Pipeline de CI/CD de 7 jobs** con publicación de imágenes en GHCR.
+- **Evaluación experimental contra ISO/IEC 25010**: 5 características medidas con datos reales
+  (no simulados) — resultados honestos, incluyendo los umbrales que no se alcanzaron y por qué.
 
 ## Licencia
 

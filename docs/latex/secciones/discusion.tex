@@ -1,4 +1,4 @@
-\section{Discusión}
+\section{Discusión (Entrega 3)}
 \label{sec:discusion}
 
 \subsection{Sobre la fragmentación por fecha frente al patrón de acceso real}
@@ -65,3 +65,9 @@ microservicios mediante un único archivo \texttt{docker-compose.yml} raíz— n
 esta entrega y quedan identificados como extensión pendiente: actualmente cada microservicio se
 levanta y orquesta de forma independiente, sin una capa de enrutamiento y políticas transversales
 (limitación de tasa, agregación de respuestas) centralizada.
+
+\paragraph{Resuelto en la Entrega 4.} Ambos pendientes se cerraron en el ciclo siguiente:
+\texttt{api-gateway} (Spring Cloud Gateway) es hoy el único punto de entrada para los dos
+clientes, y un único \texttt{docker-compose.yml} en la raíz del repositorio orquesta los 17
+contenedores del sistema completo, incluyendo un servicio \texttt{db-init} de un solo uso que
+automatiza la inicialización de bases de datos antes manual (Sección~\ref{sec:arquitectura-e4}).

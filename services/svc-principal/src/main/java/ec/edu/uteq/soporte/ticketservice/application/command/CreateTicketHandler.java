@@ -2,6 +2,7 @@ package ec.edu.uteq.soporte.ticketservice.application.command;
 
 import ec.edu.uteq.soporte.ticketservice.application.TicketAuthorization;
 import ec.edu.uteq.soporte.ticketservice.application.TicketWriter;
+import ec.edu.uteq.soporte.ticketservice.application.correlation.CorrelationService;
 import ec.edu.uteq.soporte.ticketservice.domain.EventPublisher;
 import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
 import ec.edu.uteq.soporte.ticketservice.domain.event.TicketCreatedEvent;
@@ -24,16 +25,19 @@ public class CreateTicketHandler implements TicketCommandHandler<CreateTicketCom
     private final TicketFactory ticketFactory;
     private final TicketWriter ticketWriter;
     private final EventPublisher eventPublisher;
+    private final CorrelationService correlationService;
 
     public CreateTicketHandler(
             TicketAuthorization authorization,
             TicketFactory ticketFactory,
             TicketWriter ticketWriter,
-            EventPublisher eventPublisher) {
+            EventPublisher eventPublisher,
+            CorrelationService correlationService) {
         this.authorization = authorization;
         this.ticketFactory = ticketFactory;
         this.ticketWriter = ticketWriter;
         this.eventPublisher = eventPublisher;
+        this.correlationService = correlationService;
     }
 
     @Override
@@ -44,6 +48,10 @@ public class CreateTicketHandler implements TicketCommandHandler<CreateTicketCom
                 command.zone(), command.clientId(), buildDescription(command));
         Ticket saved = ticketWriter.saveWithRetry(ticket);
         publishTicketCreated(saved);
+        // Adicion 1 (Ampliacion del Modulo G): decide si "saved" se agrupa en una Incidencia
+        // existente o abre una nueva -- ver CorrelationService. Nunca bloquea ni revierte la
+        // creacion del ticket, mismo principio que el publish de Kafka de arriba.
+        correlationService.correlacionar(saved);
         return saved;
     }
 

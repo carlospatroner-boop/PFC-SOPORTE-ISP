@@ -1,0 +1,29 @@
+server:
+  port: 8006
+
+spring:
+  application:
+    name: telemetry-service
+
+# Puerto del servidor de sockets TCP (ver TelemetrySocketServer) -- el canal de negocio real
+# de este servicio. No es un puerto de Spring, se lee a mano con @Value.
+telemetry:
+  socket:
+    port: ${TELEMETRY_SOCKET_PORT:9500}
+
+grpc:
+  server:
+    port: ${TELEMETRY_GRPC_PORT:9095}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    ec.edu.uteq.soporte: INFO

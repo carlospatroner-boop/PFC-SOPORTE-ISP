@@ -3,44 +3,44 @@ Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: main.aux
 The style file: ieeetr.bst
 Database file #1: referencias.bib
-You've used 19 entries,
+You've used 38 entries,
             1876 wiz_defined-function locations,
-            585 strings with 6927 characters,
-and the built_in function-call counts, 5058 in all, are:
-= -- 492
-> -- 215
-< -- 1
-+ -- 81
-- -- 62
-* -- 342
-:= -- 725
-add.period$ -- 27
-call.type$ -- 19
-change.case$ -- 14
+            681 strings with 10131 characters,
+and the built_in function-call counts, 9148 in all, are:
+= -- 877
+> -- 406
+< -- 2
++ -- 154
+- -- 116
+* -- 591
+:= -- 1309
+add.period$ -- 54
+call.type$ -- 38
+change.case$ -- 28
 chr.to.int$ -- 0
-cite$ -- 19
-duplicate$ -- 258
-empty$ -- 491
-format.name$ -- 62
-if$ -- 1227
+cite$ -- 38
+duplicate$ -- 468
+empty$ -- 903
+format.name$ -- 116
+if$ -- 2242
 int.to.chr$ -- 0
-int.to.str$ -- 19
-missing$ -- 22
-newline$ -- 68
-num.names$ -- 19
-pop$ -- 79
+int.to.str$ -- 38
+missing$ -- 42
+newline$ -- 133
+num.names$ -- 38
+pop$ -- 169
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 154
+skip$ -- 286
 stack$ -- 0
-substring$ -- 304
-swap$ -- 94
-text.length$ -- 1
+substring$ -- 438
+swap$ -- 170
+text.length$ -- 2
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 0
 warning$ -- 0
-while$ -- 49
-width$ -- 21
-write$ -- 192
+while$ -- 80
+width$ -- 40
+write$ -- 369

@@ -48,6 +48,24 @@ este trabajo al protocolo experimental de la Sección~\ref{sec:protocolo-resulta
 objeto de medición es un pipeline analítico completo y no operaciones individuales de
 lectura/escritura.
 
+\subsection{Diseño, monitorización y pruebas de sistemas de microservicios}
+
+El refactor a arquitectura hexagonal y la pirámide de pruebas de la Sección~\ref{sec:pruebas-cicd}
+se alinean con lo que la literatura reciente reporta como brechas reales entre lo que los equipos
+de la industria practican y lo que la investigación académica cubre. Waseem et
+al.~\cite{waseem2021microservices}, en un estudio mixto con 106 encuestas y 6 entrevistas a
+practicantes de microservicios, documentan que el aislamiento de la lógica de dominio detrás de
+puertos —el mismo principio que sustenta el patrón Repository de esta entrega
+(Sección~\ref{sec:hexagonal-e4})— es una de las prácticas de diseño más citadas mientras que la
+observabilidad de las tres señales (Sección~\ref{sec:observabilidad}) sigue siendo, en su muestra,
+una de las prácticas de monitorización menos madura en despliegues reales. Hui et
+al.~\cite{hui2025microservices}, en un mapeo sistemático más reciente sobre métodos de prueba de
+microservicios, identifican las pruebas de contrato entre consumidor y proveedor —el mecanismo
+Pact descrito en la Sección~\ref{sec:pruebas-cicd}— como una de las categorías con mayor brecha
+entre su valor reportado por los equipos y su adopción efectiva, consistente con la complejidad
+real encontrada al verificarlas en esta entrega (necesidad del \emph{stack} completo levantado,
+ajuste de modelado para campos con forma mixta).
+
 \subsection{Metodología experimental}
 
 El diseño del protocolo experimental (variables independientes y dependientes, repeticiones,

@@ -144,18 +144,25 @@ nada sobre ellas.
 Ejecutado con `mvn test -Pcoverage` (perfil ya existente en `services/svc-principal/pom.xml`).
 Solo `svc-principal` tiene JaCoCo configurado en este momento (`auth-service`, `report-service` y
 `api-gateway` no tienen el plugin agregado a su `pom.xml`) — se reporta lo que existe, sin
-inventar un número para los otros tres:
+inventar un número para los otros tres. El perfil `coverage` excluye explícitamente el código
+generado automáticamente por protobuf/grpc-java a partir de `telemetry.proto` (boilerplate
+mecánico sin lógica propia, que ninguna convención de pruebas exige cubrir a mano):
 
 | Métrica | Cubierto | Total | % |
 |---|---|---|---|
-| Líneas | 325 | 548 | **59.3%** |
-| Instrucciones | 1453 | 2839 | 51.2% |
-| Ramas | 70 | 138 | 50.7% |
+| Líneas | 542 | 668 | **81.1%** |
+| Instrucciones | 2529 | 3518 | 71.9% |
+| Ramas | 88 | 154 | 57.1% |
 
-El objetivo documentado en el propio `pom.xml` es "≥ 70%" — con **59.3%** de cobertura de líneas,
-`svc-principal` queda **por debajo** de esa meta. Se reporta el número real en vez de uno
-ajustado: es una brecha real, útil para priorizar qué clases carecen de pruebas antes de la
-entrega final (ver `target/site/jacoco/index.html` para el detalle por paquete).
+El objetivo documentado en el propio `pom.xml` es "≥ 70%" — con **81.1%** de cobertura de líneas,
+`svc-principal` **supera** esa meta. El número previo reportado en esta entrega (59.3%, antes de
+que `telemetry-service`/`CORREL` existieran) había bajado a un engañoso 42.7% una vez agregado ese
+código sin la exclusión — se corrigió excluyendo el código generado (práctica estándar de JaCoCo,
+documentada en el propio `pom.xml`) y agregando 31 pruebas unitarias nuevas dirigidas con este
+mismo reporte a las clases reales con más líneas sin cubrir: el orquestador de `CORREL`
+(`CorrelationService`), los tres observadores concretos del patrón Observer, el manejador global
+de excepciones, y el mapeo/adaptador de persistencia de `Incidencia` (ver
+`target/site/jacoco/index.html` para el detalle por paquete).
 
 ### Complejidad ciclomática (segunda mitad de la métrica de Mantenibilidad)
 

@@ -1,0 +1,98 @@
+\section{Aplicación web}
+\label{sec:web}
+
+\subsection{Framework y justificación}
+
+Se eligió React 18 con TypeScript en modo estricto sobre Vite, empaquetado en un
+\emph{Dockerfile} \emph{multi-stage} (etapa \texttt{builder} con Node LTS, etapa de ejecución con
+\texttt{nginx:alpine}). La aplicación sigue el patrón de \textbf{arquitectura por
+características} (\emph{feature-based}): cada módulo de negocio (\texttt{console},
+\texttt{admin}, \texttt{reports}, \texttt{auth}) agrupa sus propios componentes, \emph{hooks} de
+acceso a la API y pruebas, en vez de una organización por tipo técnico (todos los componentes
+juntos, todos los servicios juntos) que dificulta ubicar el código relacionado con una misma
+funcionalidad de negocio.
+
+\subsection{Capturas reales}
+\label{sec:web-capturas}
+
+La Figura~\ref{fig:web-capturas} muestra cuatro pantallas capturadas en vivo contra el
+\emph{stack} completo en ejecución (no maquetas): inicio de sesión, la consola de operadores con
+datos reales (incluido un ticket creado en vivo vía la API durante esta misma verificación, ver
+\texttt{docs/evidencias/}), el panel de reportes (modelo de lectura CQRS de
+\texttt{report-service}, con un total distinto al de la consola porque se reconstruye de forma
+asíncrona a partir de eventos de Kafka, no es una copia sincrónica), y la administración de
+cuentas.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../../release/screenshots/01_login.png}
+  \\ \footnotesize (a) Inicio de sesión
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../../release/screenshots/02_consola_operadores_admin.png}
+  \\ \footnotesize (b) Consola de operadores (rol ADMIN)
+\end{minipage}
+\vspace{0.5em}
+\begin{minipage}{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../../release/screenshots/03_reportes.png}
+  \\ \footnotesize (c) Reportes (CQRS)
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../../release/screenshots/04_administracion.png}
+  \\ \footnotesize (d) Administración de cuentas
+\end{minipage}
+\caption{Capturas reales de \texttt{apps/web} contra el sistema en ejecución (2026-09-03).}
+\label{fig:web-capturas}
+\end{figure}
+
+\subsection{Rutas y control de acceso}
+
+La aplicación cubre las cinco rutas mínimas exigidas por el Módulo B (\texttt{/}, \texttt{/login},
+\texttt{/main}, \texttt{/settings}, \texttt{/about}), más dos adicionales con acceso restringido
+por rol (\texttt{/admin}, \texttt{/reports}). El enrutamiento protegido se implementa con dos
+componentes de orden superior: \texttt{ProtectedRoute} (exige sesión válida) y \texttt{RoleRoute}
+(exige, además, un rol específico), ambos cubiertos por pruebas unitarias
+(\texttt{ProtectedRoute.test.tsx}, \texttt{RoleRoute.test.tsx}).
+
+El JSON Web Token~\cite{jones2015jwt} se guarda en \texttt{sessionStorage}, nunca en
+\texttt{localStorage} sin cifrar: se pierde al cerrar la pestaña del navegador, acotando la
+ventana de exposición ante un ataque de \emph{cross-site scripting} que lograra ejecutar código
+en el origen de la aplicación.
+
+\subsection{Internacionalización y estados explícitos}
+
+La interfaz está completamente traducida a español e inglés con \texttt{react-i18next}, y
+maneja de forma explícita los tres estados que toda pantalla que consume datos remotos debe
+distinguir: carga (esqueletos animados en la tabla), error (mensaje con icono, nunca una pantalla
+en blanco) y vacío (mensaje distinto a error cuando la consulta es válida pero no hay resultados).
+
+La consola es \textbf{consciente del rol}: un usuario con rol \texttt{CLIENTE} ve un título y
+subtítulo orientados a su propio caso de uso (``mis solicitudes'', no jerga interna de
+operaciones), y en la columna de técnico asignado ve un distintivo genérico
+(\texttt{AssignedChip}/\texttt{UnassignedChip}) en vez del identificador interno del técnico, que
+no le aporta información accionable y expondría un identificador de otro usuario innecesariamente.
+
+\subsection{Detalle completo del ticket}
+
+Al hacer clic en cualquier fila de la tabla se abre un modal (\texttt{TicketDetailModal}) que
+trae el recurso completo desde el backend (no solo los campos ya presentes en la fila),
+incluyendo la línea de tiempo (creación, plazo de SLA, resolución si aplica) y el identificador
+completo del ticket en un elemento seleccionable —pensado explícitamente para poder buscar ese
+mismo identificador después, por ejemplo tras cerrarlo desde la aplicación móvil
+(Sección~\ref{sec:movil}), y confirmar visualmente que ambos clientes leen el mismo estado del
+mismo backend.
+
+\subsection{Calidad}
+
+\texttt{eslint} con las reglas por defecto de \texttt{@typescript-eslint} corre en modo estricto
+(\texttt{--max-warnings 0}: cualquier advertencia rompe la compilación, no solo los errores). La
+cobertura de pruebas (Vitest + Testing Library) alcanza el 87.6\,\% de líneas sobre el total de la
+aplicación, con la única brecha significativa en el componente de detalle recién agregado
+(\texttt{TicketDetailModal.tsx}, 34.8\,\%), pendiente de cubrir antes del cierre del proyecto.

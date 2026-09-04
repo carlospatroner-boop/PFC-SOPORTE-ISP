@@ -1,19 +1,19 @@
 \begin{thebibliography}{10}
 
-\bibitem{ozsu2011principles}
-M.~T. {\"O}zsu and P.~Valduriez, {\em Principles of Distributed Database
-  Systems}.
-\newblock Springer, 3rd~ed., 2011.
+\bibitem{iso25010}
+{International Organization for Standardization}, ``{ISO/IEC 25010:2023} ---
+  systems and software engineering --- systems and software quality
+  requirements and evaluation ({SQuaRE}) --- product quality model.'' ISO
+  Standard, 2023.
 
-\bibitem{jain1991art}
-R.~Jain, {\em The Art of Computer Systems Performance Analysis: Techniques for
-  Experimental Design, Measurement, Simulation, and Modeling}.
-\newblock Wiley, 1991.
+\bibitem{gamma1994patterns}
+E.~Gamma, R.~Helm, R.~Johnson, and J.~Vlissides, {\em Design Patterns: Elements
+  of Reusable Object-Oriented Software}.
+\newblock Reading, MA, USA: Addison-Wesley, 1994.
 
-\bibitem{wohlin2012experimentation}
-C.~Wohlin, P.~Runeson, M.~H{\"o}st, M.~C. Ohlsson, B.~Regnell, and
-  A.~Wessl{\'e}n, {\em Experimentation in Software Engineering}.
-\newblock Springer, 2012.
+\bibitem{opentelemetry2024spec}
+{OpenTelemetry Authors}, ``{OpenTelemetry} specification, version 1.32.'' CNCF
+  Sandbox Project Documentation, 2024.
 
 \bibitem{jones2015jwt}
 M.~Jones, J.~Bradley, and N.~Sakimura, ``{JSON} web token ({JWT}),'' Tech. Rep.
@@ -54,6 +54,11 @@ D.~Abadi, ``Consistency tradeoffs in modern distributed database system design:
   {CAP} is only part of the story,'' {\em IEEE Computer}, vol.~45, no.~2,
   pp.~37--42, 2012.
 
+\bibitem{ozsu2011principles}
+M.~T. {\"O}zsu and P.~Valduriez, {\em Principles of Distributed Database
+  Systems}.
+\newblock Springer, 3rd~ed., 2011.
+
 \bibitem{zaharia2012rdd}
 M.~Zaharia, M.~Chowdhury, T.~Das, A.~Dave, J.~Ma, M.~McCauley, M.~J. Franklin,
   S.~Shenker, and I.~Stoica, ``Resilient distributed datasets: A fault-tolerant
@@ -77,6 +82,28 @@ B.~F. Cooper, A.~Silberstein, E.~Tam, R.~Ramakrishnan, and R.~Sears,
   the 1st ACM Symposium on Cloud Computing (SoCC '10)}, pp.~143--154, ACM,
   2010.
 
+\bibitem{waseem2021microservices}
+M.~Waseem, P.~Liang, M.~Shahin, A.~Di~Salle, and G.~M\'arquez, ``Design,
+  monitoring, and testing of microservices systems: The practitioners'
+  perspective,'' {\em Journal of Systems and Software}, vol.~182, p.~111061,
+  2021.
+
+\bibitem{hui2025microservices}
+M.~Hui, L.~Wang, H.~Li, R.~Yang, Y.~Song, H.~Zhuang, D.~Cui, and Q.~Li,
+  ``Unveiling the microservices testing methods, challenges, solutions, and
+  solutions gaps: A systematic mapping study,'' {\em Journal of Systems and
+  Software}, vol.~220, p.~112232, 2025.
+
+\bibitem{wohlin2012experimentation}
+C.~Wohlin, P.~Runeson, M.~H{\"o}st, M.~C. Ohlsson, B.~Regnell, and
+  A.~Wessl{\'e}n, {\em Experimentation in Software Engineering}.
+\newblock Springer, 2012.
+
+\bibitem{jain1991art}
+R.~Jain, {\em The Art of Computer Systems Performance Analysis: Techniques for
+  Experimental Design, Measurement, Simulation, and Modeling}.
+\newblock Wiley, 1991.
+
 \bibitem{runeson2009guidelines}
 P.~Runeson and M.~H{\"o}st, ``Guidelines for conducting and reporting case
   study research in software engineering,'' {\em Empirical Software
@@ -91,9 +118,75 @@ M.~Kleppmann, {\em Designing Data-Intensive Applications: The Big Ideas Behind
 J.~L. Gustafson, ``Reevaluating amdahl's law,'' {\em Communications of the
   ACM}, vol.~31, no.~5, pp.~532--533, 1988.
 
+\bibitem{martin2017clean}
+R.~C. Martin, {\em Clean Architecture: A Craftsman's Guide to Software
+  Structure and Design}.
+\newblock Upper Saddle River, NJ, USA: Prentice Hall, 2017.
+
+\bibitem{evans2003ddd}
+E.~Evans, {\em Domain-Driven Design: Tackling Complexity in the Heart of
+  Software}.
+\newblock Boston, MA, USA: Addison-Wesley, 2003.
+
+\bibitem{wasserman2010mobile}
+A.~I. Wasserman, ``Software engineering issues for mobile application
+  development,'' in {\em Proceedings of the FSE/SDP Workshop on Future of
+  Software Engineering Research (FoSER)}, pp.~397--400, ACM, 2010.
+
+\bibitem{elkassas2017taxonomy}
+W.~S. El-Kassas, B.~A. Abdullah, A.~H. Yousef, and A.~M. Wahba, ``Taxonomy of
+  cross-platform mobile applications development approaches,'' {\em Ain Shams
+  Engineering Journal}, vol.~8, no.~2, pp.~163--190, 2017.
+
+\bibitem{biornhansen2019crossplatform}
+A.~Bi{\o}rn-Hansen, T.-M. Gr{\o}nli, G.~Ghinea, and S.~Alouneh, ``An empirical
+  study of cross-platform mobile development in industry,'' {\em Wireless
+  Communications and Mobile Computing}, p.~5743892, 2019.
+
+\bibitem{humble2010continuous}
+J.~Humble and D.~Farley, {\em Continuous Delivery: Reliable Software Releases
+  through Build, Test, and Deployment Automation}.
+\newblock Boston, MA, USA: Addison-Wesley, 2010.
+
+\bibitem{kim2021devops}
+G.~Kim, J.~Humble, P.~Debois, and J.~Willis, {\em The {DevOps} Handbook}.
+\newblock Portland, OR, USA: IT Revolution Press, 2nd~ed., 2021.
+
+\bibitem{sigelman2010dapper}
+B.~H. Sigelman, L.~A. Barroso, M.~Burrows, P.~Stephenson, M.~Plakal, D.~Beaver,
+  S.~Jaspan, and C.~Shanbhag, ``Dapper, a large-scale distributed systems
+  tracing infrastructure,'' Tech. Rep. dapper-2010-1, Google, Inc., 2010.
+
+\bibitem{beyer2016sre}
+B.~Beyer, C.~Jones, J.~Petoff, and N.~R. Murphy, {\em Site Reliability
+  Engineering: How Google Runs Production Systems}.
+\newblock Sebastopol, CA, USA: O'Reilly Media, 2016.
+
 \bibitem{cockroachlabs2024docs}
 {Cockroach Labs}, ``{CockroachDB} documentation.''
   \url{https://www.cockroachlabs.com/docs/}, 2024.
 \newblock Accedido: julio 2026.
+
+\bibitem{brown2018c4model}
+S.~Brown, ``The {C4} model for visualising software architecture.''
+  \url{https://c4model.com/}, 2018.
+\newblock Accedido: septiembre 2026.
+
+\bibitem{lamport1978time}
+L.~Lamport, ``Time, clocks, and the ordering of events in a distributed
+  system,'' {\em Communications of the ACM}, vol.~21, no.~7, pp.~558--565,
+  1978.
+
+\bibitem{ammann2016testing}
+P.~Ammann and J.~Offutt, {\em Introduction to Software Testing}.
+\newblock Cambridge, UK: Cambridge University Press, 2nd~ed., 2016.
+
+\bibitem{owasp2021top10}
+{OWASP Foundation}, ``{OWASP} top 10 web application security risks --- 2021.''
+  Online report, 2021.
+
+\bibitem{acm2018ethics}
+{ACM Council}, ``{ACM} code of ethics and professional conduct.'' Online policy
+  document, 2018.
 
 \end{thebibliography}

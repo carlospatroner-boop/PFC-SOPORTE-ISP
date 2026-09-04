@@ -1,0 +1,66 @@
+\section{Observabilidad distribuida}
+\label{sec:observabilidad}
+
+La observabilidad de un sistema distribuido se sustenta en tres señales complementarias:
+métricas, registros estructurados y trazas correlacionadas por un identificador
+común~\cite{sigelman2010dapper,beyer2016sre}. El estándar OpenTelemetry~\cite{opentelemetry2024spec}
+unifica su modelo de datos y su exportación, permitiendo que distintos proveedores de \emph{backend}
+consuman las mismas señales sin instrumentación duplicada.
+
+\subsection{Métricas}
+
+Se reutilizan las métricas de CockroachDB ya expuestas desde la Entrega 3
+(\texttt{crdb\_query\_duration\_seconds}, \texttt{crdb\_transaction\_retries\_total},
+\texttt{crdb\_pool\_active\_connections}) y se agregan cuatro métricas nuevas de aplicación,
+recolectadas por Micrometer y expuestas en \texttt{/actuator/prometheus} de cada servicio Java (y
+su equivalente en \texttt{api-gateway} vía un \emph{filter} reactivo):
+
+\begin{itemize}[nosep]
+  \item \texttt{http\_requests\_total} --- contador de peticiones, etiquetado por ruta, método y
+        código de estado.
+  \item \texttt{http\_request\_duration\_seconds} --- histograma de latencia, mismas etiquetas.
+  \item \texttt{app\_active\_sessions} --- \emph{gauge} de sesiones activas reales, respaldado por
+        el conteo de \emph{refresh tokens} no revocados y no expirados en \texttt{auth-service}.
+  \item \texttt{app\_business\_events\_total} --- contador de eventos de negocio; el primer y
+        único evento real que el sistema dispara por sí mismo es el escalado de un ticket
+        (patrón Observer, Sección~\ref{sec:hexagonal-e4}).
+\end{itemize}
+
+En las rutas de \texttt{api-gateway} y \texttt{ticket-service}, los identificadores de recurso
+(UUID) se normalizan a \texttt{\{id\}} en la etiqueta de ruta antes de registrar la métrica, para
+evitar una explosión de cardinalidad de series temporales distintas por cada ticket individual.
+
+\subsection{Registros estructurados}
+
+Los cuatro servicios Java emiten registros en JSON estructurado con Logback
+(\texttt{LogstashEncoder}), incluyendo el campo \texttt{trace\_id}. El agente Java de
+OpenTelemetry, adjuntado en tiempo de ejecución vía \texttt{-javaagent}, escribe automáticamente
+\texttt{trace\_id} y \texttt{span\_id} en el contexto de diagnóstico (MDC) de cada hilo que
+procesa una petición instrumentada —la configuración de Logback solo necesita leer esas dos
+claves, sin ningún cambio en el código de la aplicación.
+
+\subsection{Trazas distribuidas}
+
+El mismo agente Java exporta trazas vía OTLP a un \textbf{OpenTelemetry Collector}, que las
+reenvía a \textbf{Grafana Tempo} para su almacenamiento y consulta. Una traza típica de una
+petición \texttt{GET /api/v1/tickets} atraviesa: el span de recepción en \texttt{api-gateway}, el
+span de la llamada HTTP saliente a \texttt{auth-service /validate}, el span del \emph{handler} de
+aplicación en \texttt{ticket-service}, y el span de la consulta JDBC a CockroachDB —los cuatro
+correlacionados por el mismo \texttt{trace\_id} que aparece en los registros de cada servicio
+involucrado.
+
+\textbf{Limitación conocida}: la aplicación móvil no incluye un SDK de OpenTelemetry propio, así
+que la traza visible de una petición originada en el cliente móvil comienza en
+\texttt{api-gateway}, no dentro del proceso del teléfono. Se documenta esta limitación
+explícitamente en vez de presentar una instrumentación de cliente que no existe.
+
+\subsection{Dashboard operativo}
+
+El dashboard de Grafana, versionado como JSON reproducible en
+\texttt{ops/grafana/pfc-dashboard.json}, incluye los seis paneles obligatorios: tasa de
+peticiones, latencia p50/p95/p99, tasa de errores 5xx, disponibilidad Raft del cluster
+CockroachDB (nodos vivos, rangos no disponibles), uso de recursos por contenedor (vía cAdvisor,
+única forma práctica de obtener CPU/memoria por contenedor ya que los \texttt{/actuator/prometheus}
+de cada servicio solo reportan métricas de su propia JVM), y latencia extremo a extremo, proxied
+a través de las métricas de \texttt{api-gateway} por ser el único punto por el que pasan
+absolutamente todas las peticiones de ambos clientes.

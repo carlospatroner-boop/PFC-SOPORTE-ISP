@@ -1,4 +1,4 @@
-package ec.edu.uteq.soporte.reportservice.web.dto;
+package ec.edu.uteq.soporte.reportservice.presentation.dto;
 
 import ec.edu.uteq.soporte.reportservice.domain.TicketSummary;
 

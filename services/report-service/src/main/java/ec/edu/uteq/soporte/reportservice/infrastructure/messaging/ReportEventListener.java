@@ -1,13 +1,12 @@
-package ec.edu.uteq.soporte.reportservice.config;
+package ec.edu.uteq.soporte.reportservice.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ec.edu.uteq.soporte.reportservice.domain.TicketSummary;
-import ec.edu.uteq.soporte.reportservice.domain.TicketSummaryId;
-import ec.edu.uteq.soporte.reportservice.event.TicketAssignedEvent;
-import ec.edu.uteq.soporte.reportservice.event.TicketClassifiedEvent;
-import ec.edu.uteq.soporte.reportservice.event.TicketCreatedEvent;
-import ec.edu.uteq.soporte.reportservice.event.TicketStatusChangedEvent;
-import ec.edu.uteq.soporte.reportservice.repository.TicketSummaryRepository;
+import ec.edu.uteq.soporte.reportservice.domain.TicketSummaryRepository;
+import ec.edu.uteq.soporte.reportservice.domain.event.TicketAssignedEvent;
+import ec.edu.uteq.soporte.reportservice.domain.event.TicketClassifiedEvent;
+import ec.edu.uteq.soporte.reportservice.domain.event.TicketCreatedEvent;
+import ec.edu.uteq.soporte.reportservice.domain.event.TicketStatusChangedEvent;
 import org.springframework.dao.DataAccessException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -21,7 +20,10 @@ import java.util.logging.Logger;
 /**
  * Lado de escritura del modelo de lectura CQRS: reconstruye `ticket_summary`
  * (report_db) unicamente a partir de los 4 eventos que publican ticket-service/
- * ai-service.
+ * ai-service. Vive en infrastructure/messaging (no en application) porque
+ * @KafkaListener es un detalle tecnico de transporte -- mismo criterio que
+ * TicketClassificationListener en ticket-service -- y depende solo del puerto de
+ * dominio TicketSummaryRepository, no de Spring Data JPA directamente.
  *
  * Cada uno de los 4 @KafkaListener corre en su propio hilo/consumer group
  * independiente -- Spring no da ninguna garantia de orden *entre* topicos
@@ -145,12 +147,12 @@ public class ReportEventListener {
     // completa los campos que trae su propio evento, dejando el resto en su default
     // provisional hasta que el evento faltante llegue y complete la fila.
     private TicketSummary withSummary(String zone, String ticketId) {
-        TicketSummaryId id = new TicketSummaryId(zone, UUID.fromString(ticketId));
-        return repository.findById(id).orElseGet(() -> {
+        UUID id = UUID.fromString(ticketId);
+        return repository.findByZoneAndTicketId(zone, id).orElseGet(() -> {
             LOGGER.info("Evento adelantado a ticket.created para " + ticketId + " -- se crea una fila provisional");
             return TicketSummary.builder()
                     .zone(zone)
-                    .ticketId(UUID.fromString(ticketId))
+                    .ticketId(id)
                     .status("NUEVO")
                     .createdAt(OffsetDateTime.now())
                     .build();

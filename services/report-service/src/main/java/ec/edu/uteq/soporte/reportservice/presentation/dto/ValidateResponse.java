@@ -1,4 +1,4 @@
-package ec.edu.uteq.soporte.reportservice.web.dto;
+package ec.edu.uteq.soporte.reportservice.presentation.dto;
 
 /**
  * Copia local del subconjunto de campos que necesitamos de la respuesta de

@@ -1,4 +1,4 @@
-package ec.edu.uteq.soporte.reportservice.metrics;
+package ec.edu.uteq.soporte.reportservice.infrastructure.metrics;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

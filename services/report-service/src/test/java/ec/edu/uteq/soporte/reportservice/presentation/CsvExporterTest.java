@@ -1,4 +1,4 @@
-package ec.edu.uteq.soporte.reportservice.web;
+package ec.edu.uteq.soporte.reportservice.presentation;
 
 import ec.edu.uteq.soporte.reportservice.domain.TicketSummary;
 import org.junit.jupiter.api.Test;

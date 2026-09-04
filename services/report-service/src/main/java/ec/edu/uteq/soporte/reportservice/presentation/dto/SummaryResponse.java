@@ -1,4 +1,4 @@
-package ec.edu.uteq.soporte.reportservice.web.dto;
+package ec.edu.uteq.soporte.reportservice.presentation.dto;
 
 import java.util.Map;
 

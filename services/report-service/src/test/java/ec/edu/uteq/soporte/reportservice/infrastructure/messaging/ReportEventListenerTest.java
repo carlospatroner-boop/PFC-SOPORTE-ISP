@@ -1,8 +1,8 @@
-package ec.edu.uteq.soporte.reportservice.config;
+package ec.edu.uteq.soporte.reportservice.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ec.edu.uteq.soporte.reportservice.domain.TicketSummary;
-import ec.edu.uteq.soporte.reportservice.repository.TicketSummaryRepository;
+import ec.edu.uteq.soporte.reportservice.domain.TicketSummaryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -72,7 +72,7 @@ class ReportEventListenerTest {
                 .status("NUEVO")
                 .createdAt(OffsetDateTime.now())
                 .build();
-        when(repository.findById(any())).thenReturn(Optional.of(existing));
+        when(repository.findByZoneAndTicketId(any(), any())).thenReturn(Optional.of(existing));
         ArgumentCaptor<TicketSummary> captor = ArgumentCaptor.forClass(TicketSummary.class);
 
         String payload = """
@@ -93,7 +93,7 @@ class ReportEventListenerTest {
         // crear una fila provisional en vez de descartar el evento.
         ReportEventListener listener = new ReportEventListener(repository, objectMapper);
         UUID ticketId = UUID.randomUUID();
-        when(repository.findById(any())).thenReturn(Optional.empty());
+        when(repository.findByZoneAndTicketId(any(), any())).thenReturn(Optional.empty());
         ArgumentCaptor<TicketSummary> captor = ArgumentCaptor.forClass(TicketSummary.class);
 
         String payload = """
@@ -123,7 +123,7 @@ class ReportEventListenerTest {
                 .status("ASIGNADO")
                 .technicianId(technicianId)
                 .build();
-        when(repository.findById(any())).thenReturn(Optional.of(provisional));
+        when(repository.findByZoneAndTicketId(any(), any())).thenReturn(Optional.of(provisional));
         ArgumentCaptor<TicketSummary> captor = ArgumentCaptor.forClass(TicketSummary.class);
 
         String payload = """
@@ -146,7 +146,7 @@ class ReportEventListenerTest {
                 .ticketId(ticketId)
                 .status("NUEVO")
                 .build();
-        when(repository.findById(any())).thenReturn(Optional.of(existing));
+        when(repository.findByZoneAndTicketId(any(), any())).thenReturn(Optional.of(existing));
         ArgumentCaptor<TicketSummary> captor = ArgumentCaptor.forClass(TicketSummary.class);
 
         String payload = """
@@ -168,7 +168,7 @@ class ReportEventListenerTest {
                 .ticketId(ticketId)
                 .status("NUEVO")
                 .build();
-        when(repository.findById(any())).thenReturn(Optional.of(existing));
+        when(repository.findByZoneAndTicketId(any(), any())).thenReturn(Optional.of(existing));
         ArgumentCaptor<TicketSummary> captor = ArgumentCaptor.forClass(TicketSummary.class);
 
         String payload = """

@@ -1,7 +1,7 @@
-package ec.edu.uteq.soporte.reportservice.web;
+package ec.edu.uteq.soporte.reportservice.presentation;
 
-import ec.edu.uteq.soporte.reportservice.service.ForbiddenException;
-import ec.edu.uteq.soporte.reportservice.web.dto.ApiResponse;
+import ec.edu.uteq.soporte.reportservice.application.ForbiddenException;
+import ec.edu.uteq.soporte.reportservice.presentation.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

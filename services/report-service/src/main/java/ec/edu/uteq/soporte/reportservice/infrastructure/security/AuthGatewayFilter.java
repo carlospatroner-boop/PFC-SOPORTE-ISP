@@ -1,8 +1,8 @@
-package ec.edu.uteq.soporte.reportservice.config;
+package ec.edu.uteq.soporte.reportservice.infrastructure.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ec.edu.uteq.soporte.reportservice.web.dto.ApiResponse;
-import ec.edu.uteq.soporte.reportservice.web.dto.ValidateResponse;
+import ec.edu.uteq.soporte.reportservice.presentation.dto.ApiResponse;
+import ec.edu.uteq.soporte.reportservice.presentation.dto.ValidateResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

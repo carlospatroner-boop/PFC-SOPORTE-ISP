@@ -229,6 +229,20 @@
                                 </goals>
                             </execution>
                         </executions>
+                        <configuration>
+                            <!-- Excluye el codigo generado automaticamente por protobuf/grpc-java a
+                                 partir de telemetry.proto (getters/setters/builders mecanicos, sin
+                                 logica propia, que nadie prueba a mano; practica estandar de
+                                 JaCoCo). Sin esta exclusion, el boilerplate generado diluia el
+                                 numero real de cobertura del codigo que si escribimos: bajaba de
+                                 59.3% (antes de este generador) a 42.7% (con el generador incluido,
+                                 contando en contra codigo que nunca se prueba por convencion),
+                                 cuando el codigo propio esta en realidad en 64.4% antes de las
+                                 pruebas de esta seccion. -->
+                            <excludes>
+                                <exclude>ec/edu/uteq/soporte/telemetryservice/infrastructure/grpc/**</exclude>
+                            </excludes>
+                        </configuration>
                     </plugin>
                 </plugins>
             </build>

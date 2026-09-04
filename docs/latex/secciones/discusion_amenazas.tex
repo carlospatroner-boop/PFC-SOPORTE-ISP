@@ -1,0 +1,89 @@
+\section{Discusión y amenazas a la validez (Entrega 4)}
+\label{sec:discusion-e4}
+
+\subsection{Interpretación de los resultados}
+
+El sistema cumple de forma sólida las características de calidad relacionadas con
+\textbf{estructura y verificabilidad del código} (arquitectura hexagonal con dependencia del
+dominio hacia adentro, seis patrones GoF con problema real documentado, complejidad ciclomática
+media de 1.8, pirámide de pruebas completa con 174 pruebas automatizadas ejecutadas en el último
+ciclo) y las relacionadas con \textbf{compatibilidad de cliente} (la misma suite E2E pasa en tres
+motores de navegador distintos, y el código respeta su API mínima declarada). Donde el sistema
+\emph{no} alcanza el umbral objetivo es, de forma consistente, bajo \textbf{concurrencia real}:
+tanto la eficiencia de desempeño como la fiabilidad se degradan por una limitación de la edición
+gratuita del motor de base de datos (Sección~\ref{sec:iso25010}), no por un defecto de diseño de
+la aplicación. Esta distinción —entre ``el diseño no soporta esta carga'' y ``el entorno de
+demostración no soporta esta carga''— es central para interpretar correctamente los resultados: la
+arquitectura (Raft con quorum de mayoría, \emph{stateless} en cada microservicio, saga por
+coreografía sin coordinador central) sí está diseñada para escalar horizontalmente; lo que falta
+es la licencia o el plan de CockroachDB que levante el límite artificial de transacciones
+concurrentes.
+
+\subsection{Alcance y limitaciones}
+
+Este proyecto es un sistema de demostración académica, no un despliegue de producción: corre en
+una sola máquina de desarrollo con Docker Desktop, sobre datos sintéticos, sin balanceo de carga
+real entre réplicas, y sin el hardware dedicado que un ISP real destinaría a este tipo de
+sistema. Las conclusiones sobre desempeño y fiabilidad son válidas \emph{para este entorno}, y se
+documentan explícitamente como tales en vez de generalizarse sin matización a cualquier
+despliegue posible.
+
+\subsection{Amenazas a la validez del proyecto (a nivel general)}
+
+Más allá de las amenazas específicas del experimento de carga (ya discutidas en
+Sección~\ref{sec:iso25010}), a nivel de todo el proyecto:
+
+\textbf{Internas}:
+\begin{enumerate}[nosep]
+  \item \textbf{Un solo desarrollador principal por capa}: cada integrante del equipo se
+        concentró en un área (backend, observabilidad, contratos, documentación), lo que agiliza
+        el desarrollo pero concentra el conocimiento profundo de cada módulo en una sola persona
+        —mitigado parcialmente por la documentación exhaustiva (ADRs, esta guía) que permite a
+        cualquier integrante razonar sobre módulos que no escribió directamente.
+  \item \textbf{Verificación local, no en el entorno de ejecución final}: buena parte de la
+        verificación de este ciclo (pruebas de backend con Testcontainers, cobertura, complejidad
+        ciclomática) se corrió en un contenedor Maven anidado dentro de Docker Desktop en
+        Windows, un entorno con una limitación conocida de redes anidadas (\emph{Docker outside
+        of Docker}) que impidió ejecutar una prueba de integración específica localmente —mitigado
+        porque esa misma prueba sí corre en verde en el \emph{runner} de GitHub Actions, que
+        ejecuta Maven directo sobre la máquina virtual sin anidar Docker.
+  \item \textbf{Datos de demostración generados sintéticamente}: los 504+ tickets de prueba se
+        generaron y rebalancearon con un script SQL propio, no provienen de un ISP real —mitigado
+        documentando explícitamente el script de generación (\texttt{resultados/rebalance\_demo\_tickets.sql})
+        para que la distribución de estados sea auditable y reproducible.
+\end{enumerate}
+
+\textbf{Externas}:
+\begin{enumerate}[nosep]
+  \item \textbf{Generalización a otros ISP}: el dominio (zonas de cobertura, categorías de
+        incidencia, políticas de SLA) se modeló según supuestos razonables del equipo, no según
+        un proceso de negocio documentado de un operador real —una limitación externa reconocida
+        desde la Entrega 1.
+  \item \textbf{Generalización a escala de producción}: las cifras de esta evaluación (latencia,
+        tasa de error, cobertura) corresponden a un solo nodo de desarrollo con datos sintéticos;
+        no se puede extrapolar directamente el comportamiento a un despliegue con tráfico real de
+        miles de usuarios concurrentes sin repetir el experimento en ese entorno.
+\end{enumerate}
+
+\subsection{Reflexión ética}
+
+El sistema procesa datos personales reales de abonados de un ISP: ubicación de la incidencia,
+historial de contacto, y las credenciales de acceso de clientes, técnicos y administradores. El
+Código de Ética y Conducta Profesional de la ACM~\cite{acm2018ethics} establece, entre sus
+principios generales, evitar daño y respetar la privacidad; frente a esos principios, el equipo
+identifica lo siguiente:
+
+\textbf{Ya aplicado en el sistema}: las contraseñas nunca se almacenan en texto plano
+(\texttt{BCryptPasswordEncoder}, factor de costo por defecto de Spring Security); los tokens de
+sesión (JWT) tienen expiración corta y un mecanismo de revocación vía \emph{refresh tokens}; y
+ningún \emph{endpoint} de administración de la plataforma (\texttt{actuator}) expone información
+sensible del entorno de ejecución (variables, volcado de memoria).
+
+\textbf{Reconocido como pendiente, no resuelto}: la revisión de seguridad de esta entrega
+(Sección~\ref{sec:iso25010}) encontró que el sistema no protege el endpoint de inicio de sesión
+contra intentos repetidos de adivinar una contraseña. Frente a datos reales de personas —técnicos
+de campo cuya ubicación queda registrada, clientes cuyo domicilio se infiere de su zona de
+cobertura— esta es una responsabilidad ética concreta, no solo un requisito técnico: el equipo
+documenta esta brecha de forma explícita, en vez de omitirla, precisamente porque una evaluación
+honesta de los riesgos reales del sistema es un prerrequisito para poder mitigarlos antes de un
+eventual uso con usuarios reales.

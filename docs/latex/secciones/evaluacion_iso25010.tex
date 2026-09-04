@@ -1,0 +1,127 @@
+\section{Evaluación experimental ISO/IEC 25010}
+\label{sec:iso25010}
+
+El modelo de calidad ISO/IEC 25010:2023~\cite{iso25010} organiza la calidad de producto en ocho
+características; esta entrega evalúa las cinco exigidas por la guía, cada una con al menos una
+métrica cuantitativa y su umbral objetivo (Tabla~\ref{tab:iso-umbrales}), siguiendo el rigor de
+reporte experimental de Jain~\cite{jain1991art} y Wohlin et al.~\cite{wohlin2012experimentation}.
+
+\subsection{Preguntas de investigación}
+\label{sec:preguntas-investigacion}
+
+Siguiendo el criterio de Wohlin et al.~\cite{wohlin2012experimentation} de que una pregunta de
+investigación debe admitir una respuesta negativa para ser una pregunta y no una afirmación
+disfrazada, esta entrega formula tres, cada una respondida con datos ya obtenidos y no con una
+expectativa:
+
+\begin{enumerate}[nosep]
+  \item \textbf{PI1.} ¿El sistema, bajo la carga concurrente medida, cumple los umbrales
+        objetivo de eficiencia de desempeño (p95 $<$ 500\,ms) y fiabilidad (error 5xx $<$ 1\,\%)
+        de ISO/IEC 25010? \textbf{Respuesta: no}, en ninguna de las dos —ver
+        Sección~\ref{sec:iso25010} de este mismo documento (subsección \emph{Eficiencia de
+        desempeño y fiabilidad}), con causa raíz identificada y no solo el síntoma.
+  \item \textbf{PI2.} ¿El sistema mitiga las seis categorías de riesgo OWASP más aplicables a su
+        arquitectura REST + JWT? \textbf{Respuesta: no completamente} —5 de 6, con una brecha
+        real y concreta documentada (ausencia de límite de intentos de inicio de sesión), no
+        cinco de seis presentadas como éxito total.
+  \item \textbf{PI3.} Antes de esta auditoría, ¿el pipeline de CI/CD garantizaba que ningún
+        artefacto se publicara en el registro sin que las cinco verificaciones automatizadas
+        pasaran primero? \textbf{Respuesta: no} —\texttt{build-images} solo dependía de dos de
+        los cinco \emph{jobs} de verificación, y corría en paralelo con el sexto
+        (\texttt{integration}) en vez de después. Ver Sección~\ref{sec:pruebas-cicd} para el
+        diagnóstico completo y la corrección aplicada.
+\end{enumerate}
+
+Las tres preguntas podían haberse respondido \enquote{sí} y el resultado seguiría siendo válido y
+reportable: el objetivo no era producir un resultado favorable, sino uno verificable.
+
+\subsection{Nota sobre el alcance}
+
+Por restricción de tiempo de entrega, el equipo decidió correr una \textbf{escala reducida} del
+experimento de carga: \textbf{r=5 repeticiones} por escenario (en vez de las 10 exigidas), con
+corridas más cortas (60--120\,s en vez de 5--10\,min). La metodología de análisis —descartar la
+primera y la última repetición, calcular media e intervalo de confianza al 95\,\% sobre las
+intermedias— es la misma que exige el protocolo, aplicada a menos muestras. El detalle completo,
+con los datos crudos de las diez corridas reales, está en
+\texttt{docs/experimentos/evaluacion\_iso25010.md}.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Las cinco características evaluadas, con su umbral objetivo y el resultado medido.}
+\label{tab:iso-umbrales}
+\begin{tabular}{@{}p{2.9cm}p{3.1cm}p{4.6cm}p{1.3cm}@{}}
+\toprule
+\textbf{Característica} & \textbf{Umbral} & \textbf{Medido} & \textbf{¿Cumple?} \\
+\midrule
+Eficiencia de desempeño & p95 $<$ 500\,ms & 1.4--1.6\,s bajo carga concurrente & No \\
+Fiabilidad & Error 5xx $<$ 1\,\% & 19--34\,\% bajo carga concurrente & No \\
+Seguridad & 100\,\% (acceso + OWASP) & 30/30 control de acceso; 5/6 categorías OWASP mitigadas & Parcial \\
+Mantenibilidad & Cobertura $\geq$70\,\% + CCN $<$10 & 81.1\,\% cobertura; CCN medio 1.8 & Sí \\
+Compatibilidad & Pasa suite E2E & 9/9 en 3 navegadores; API 26+ verificado por \emph{lint} & Sí \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Eficiencia de desempeño y fiabilidad}
+
+Se ejecutaron dos escenarios de carga con Locust contra el API Gateway: (A) 30 usuarios en carga
+plana durante 60\,s, y (B) una rampa de 0 a 60 usuarios durante 120\,s. En ambos, la tasa de
+error observada (19\,\% y 34\,\% respectivamente) superó ampliamente el umbral del 1\,\%. La
+causa raíz, confirmada directamente en los registros de \texttt{auth-service} y
+\texttt{ticket-service}, es un mensaje explícito del motor de base de datos:
+
+\begin{quote}
+\ttfamily\small ERROR: No license installed. The maximum number of concurrently open
+transactions has been reached.
+\end{quote}
+
+Es decir: bajo concurrencia real, \textbf{CockroachDB Core sin licencia} rechaza nuevas
+transacciones al superar su límite de transacciones concurrentes abiertas —una limitación
+documentada del propio motor en su edición gratuita, no un defecto de la lógica de reintento de
+la aplicación (\texttt{TicketWriter.saveWithRetry}, ya cubierta por pruebas unitarias). Con una
+licencia comercial, o migrando a CockroachDB Serverless, este límite no existiría.
+
+\subsection{Seguridad}
+
+Se verificó el control de acceso con 30 peticiones reales contra el API Gateway (10 por caso): sin
+encabezado \texttt{Authorization}, con un token de formato inválido, y con un usuario autenticado
+de rol incorrecto intentando un endpoint de administración —los tres casos fueron rechazados
+correctamente el 100\,\% de las veces (401/401/403).
+
+Para la ausencia de vulnerabilidades OWASP~\cite{owasp2021top10}, un escaneo automatizado
+completo (OWASP ZAP) quedó fuera del alcance de tiempo de esta entrega; en su lugar se
+verificaron directamente, por código y en vivo, las seis categorías más aplicables a esta
+arquitectura REST + JWT. Cinco están mitigadas (control de acceso, criptografía —contraseñas con
+\texttt{BCryptPasswordEncoder}, JWT firmado HS256—, inyección —consultas parametrizadas vía JPA,
+sin SQL nativo concatenado—, configuración de \texttt{actuator} —solo expone
+\texttt{health,info,prometheus}—, y registro/monitoreo). Se encontró una \textbf{brecha real}: no
+existe límite de intentos de inicio de sesión (\emph{rate-limiting} o bloqueo de cuenta), por lo
+que un atacante puede reintentar contraseñas sin restricción.
+
+\subsection{Mantenibilidad}
+
+Ver Sección~\ref{sec:pruebas-cicd}: cobertura de 81.1\,\% del código propio (por encima del
+objetivo del 70\,\%, sin contar código generado por protobuf/gRPC) y complejidad ciclomática
+media de 1.8 (muy por debajo del umbral de 10).
+
+\subsection{Compatibilidad}
+
+La misma suite Playwright de la Sección~\ref{sec:pruebas-cicd} se ejecutó contra tres motores de
+renderizado (Chromium, Firefox y WebKit —este último equivalente a Safari, que no corre de forma
+nativa en Windows/Linux). Las nueve pruebas pasan en los tres motores. Para la aplicación móvil,
+la evidencia disponible en este ciclo es el \texttt{minSdk=26} declarado en Gradle (una garantía
+de tiempo de compilación) y el resultado limpio de la regla \texttt{NewApi} de Android
+Lint, que falla si el código usa una API de plataforma por encima del mínimo sin una guarda de
+versión explícita.
+
+\subsection{Amenazas a la validez de este experimento}
+
+\textbf{Internas}: (1) la escala reducida (5 repeticiones, no 10) amplía los intervalos de
+confianza frente al protocolo completo; (2) Locust, el \emph{stack} completo de 17 contenedores y
+el propio proceso de verificación compitieron por CPU en una sola máquina de desarrollo,
+introduciendo ruido en la latencia medida; (3) el límite de licencia de CockroachDB es una
+propiedad de este entorno de demostración, no necesariamente de un despliegue con licencia.
+\textbf{Externas}: (1) los datos usados son sintéticos, no tráfico real de un ISP; (2) dos de los
+diez tipos de prueba de la pirámide completa (las instrumentadas de Android) no se ejecutaron en
+este ciclo por falta de un emulador conectado en el momento de la medición.

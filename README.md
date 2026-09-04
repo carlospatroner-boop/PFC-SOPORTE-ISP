@@ -123,11 +123,30 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
 
 - Decisiones de arquitectura: [`docs/adr/`](docs/adr/)
 - Diagramas C4: [`docs/diagrams/`](docs/diagrams/)
-- Manuscrito LaTeX (acumulado E1-E4): [`docs/latex/`](docs/latex/)
+- Manuscrito LaTeX (acumulado E1-E4, documento único `main.tex`): [`docs/latex/`](docs/latex/) —
+  para compilarlo:
+  ```bash
+  cd docs/latex
+  pdflatex -interaction=nonstopmode main.tex
+  bibtex main
+  pdflatex -interaction=nonstopmode main.tex
+  pdflatex -interaction=nonstopmode main.tex   # dos pasadas más para resolver referencias/bibliografía
+  ```
+  Requiere una distribución TeX Live completa (paquetes `babel`, `booktabs`, `hyperref`,
+  `enumitem`, entre otros). Si no se tiene TeX Live instalado localmente, se puede usar la imagen
+  Docker `texlive/texlive:latest-medium` montando `docs/` (no solo `docs/latex/`, porque las
+  figuras del manuscrito referencian `../diagrams/*.png` con ruta relativa) y ejecutando los
+  mismos cuatro comandos dentro del contenedor.
+- Esquema de base de datos consolidado (referencia de lectura; los scripts que realmente se
+  ejecutan siguen en `db-cluster/scripts/`): [`docs/db/schema.sql`](docs/db/schema.sql)
+- Puntos de entrada documentados a las pruebas de integración, E2E y contrato (el código real
+  vive junto a cada módulo, no se duplica aquí): [`tests/`](tests/)
 - Protocolo y resultados experimentales (Spark, Entrega 3): [`docs/experimentos/protocolo.md`](docs/experimentos/protocolo.md)
 - Evaluación experimental ISO/IEC 25010 (Entrega 4): [`docs/experimentos/evaluacion_iso25010.md`](docs/experimentos/evaluacion_iso25010.md)
 - Evidencia de tolerancia a fallos: `docs/evidencias/`
 - Declaración de uso de IA: [`ai-usage-declaration.md`](ai-usage-declaration.md)
+- Actas de reunión (reconstruidas a partir del chat real de coordinación del equipo, con fecha,
+  asistentes y decisiones reales): [`docs/actas_reunion.md`](docs/actas_reunion.md)
 
 ## Novedades de la Entrega 4
 
@@ -145,6 +164,13 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
 - **Pipeline de CI/CD de 7 jobs** con publicación de imágenes en GHCR.
 - **Evaluación experimental contra ISO/IEC 25010**: 5 características medidas con datos reales
   (no simulados) — resultados honestos, incluyendo los umbrales que no se alcanzaron y por qué.
+- **`telemetry-service` (canal PE-U1)**: servidor de sockets TCP + reloj de Lamport + gRPC para
+  telemetría de equipos del abonado y latidos de nodo — ver
+  [`docs/adr/0007-pe-u1-telemetria.md`](docs/adr/0007-pe-u1-telemetria.md).
+- **Correlación de tickets en Incidencias (`CORREL`)**: tres estrategias intercambiables
+  (`c0`/`c1`/`c2`, variable de entorno `CORREL`) para agrupar tickets de una misma avería, la
+  última con evidencia real de telemetría vía gRPC — ver
+  [`docs/adr/0008-correl-incidencias.md`](docs/adr/0008-correl-incidencias.md).
 
 ## Licencia
 

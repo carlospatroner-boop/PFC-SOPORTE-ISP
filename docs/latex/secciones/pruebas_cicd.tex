@@ -1,0 +1,161 @@
+\section{Pruebas y CI/CD}
+\label{sec:pruebas-cicd}
+
+\subsection{Pirámide de pruebas}
+
+La estrategia de pruebas cubre las cuatro capas clásicas de la pirámide~\cite{ammann2016testing},
+más una capa de carga, cada una respondiendo una pregunta que las demás no pueden:
+
+\begin{table}[H]
+\centering
+\small
+\caption{Pirámide de pruebas del sistema, con resultados reales.}
+\label{tab:piramide}
+\begin{tabular}{@{}p{2.3cm}p{3.4cm}p{4.2cm}p{3.2cm}@{}}
+\toprule
+\textbf{Capa} & \textbf{Herramienta} & \textbf{Pregunta que responde} & \textbf{Resultado} \\
+\midrule
+Unitaria & JUnit 5 / Vitest / JUnit Android & ¿Esta clase, aislada, hace lo que dice? & 90/90 backend (5 servicios Java), 78/78 web, 5/5 móvil \\
+Integración & Testcontainers & ¿Funciona contra un CockroachDB real, no un \emph{mock}? & \texttt{TicketRepositoryIntegrationTest} \\
+Contrato & Pact (consumidor + proveedor) & ¿El backend sigue la forma exacta que el cliente espera? & 2/2 consumidor, 2/2 proveedor \\
+E2E & Playwright / Compose Testing & ¿Todo el camino, navegador real incluido, funciona? & 9/9 en Chromium+Firefox+WebKit \\
+Carga & Locust & ¿Aguanta concurrencia real? & Sección~\ref{sec:iso25010} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Pruebas de contrato}
+
+Se adoptó \emph{consumer-driven contract testing} con Pact entre \texttt{apps/web} (consumidor) y
+\texttt{ticket-service} (proveedor). El consumidor genera un archivo de contrato
+(\texttt{pacts/soporte-web-ticket-service.json}) a partir de las expectativas reales del cliente
+sobre la forma de la respuesta; el proveedor lo verifica reproduciendo cada interacción contra el
+servicio real. Una particularidad de esta arquitectura obligó a una decisión de diseño: como
+\texttt{ticket-service} valida cada JWT llamando por HTTP a \texttt{auth-service}
+(\texttt{AuthGatewayFilter}) en vez de verificar la firma localmente, la verificación del
+proveedor no puede correr en un contexto de prueba aislado —necesita el \emph{stack} completo
+levantado y un JWT real obtenido de un inicio de sesión real.
+
+Un segundo ajuste, encontrado al ejecutar la verificación por primera vez, fue de modelado del
+contrato: los campos \texttt{technicianId} y \texttt{resolvedAt} son legítimamente nulos o no
+nulos según el estado real del ticket, y un solo ejemplo con matiz de tipo (\texttt{like(null)})
+no puede expresar ambos casos a la vez sobre el mismo campo. Se adoptó el patrón oficial de Pact
+para colecciones con formas mixtas (\texttt{arrayContaining} con dos variantes representativas),
+en vez de forzar una condición más débil o más fuerte que la que el sistema realmente cumple.
+
+\subsection{Pipeline de CI/CD}
+
+El archivo \texttt{.github/workflows/ci-cd.yml} define siete \emph{jobs} en un grafo dirigido
+acíclico, siguiendo la cultura DevOps de que ningún cambio llegue a un artefacto publicado sin
+pasar por los mismos controles~\cite{kim2021devops,humble2010continuous}:
+
+\begin{table}[H]
+\centering
+\small
+\caption{Los siete jobs del pipeline.}
+\label{tab:cicd}
+\begin{tabular}{@{}p{0.6cm}p{2.6cm}p{9.5cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Job} & \textbf{Qué hace} \\
+\midrule
+1 & \texttt{lint} & ESLint (web) + Android Lint (móvil) \\
+2 & \texttt{test-backend} & Los cuatro servicios Java + Node + Python, pruebas unitarias e integración \\
+3 & \texttt{test-web} & Vitest, incluido el contrato Pact del consumidor \\
+4 & \texttt{test-mobile} & Unitarias JVM + instrumentadas en un emulador Android headless real \\
+5 & \texttt{build-images} & Construye y publica las siete imágenes Docker en GHCR (solo en \emph{push}) \\
+6 & \texttt{build-mobile-apk} & Compila el APK de depuración y lo publica como artefacto \\
+7 & \texttt{integration} & Levanta el \emph{stack} completo y corre Pact proveedor + Playwright contra el backend real \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los \emph{jobs} 5 y 6 declaran \texttt{needs} sobre los \emph{jobs} de prueba correspondientes:
+GitHub Actions no los ejecuta hasta que sus dependencias terminen en verde. Esto no siempre fue
+así de completo: en una revisión externa del pipeline se encontró que \texttt{build-images} solo
+dependía de \texttt{test-backend} y \texttt{test-web}, así que publicaba imágenes en GHCR aunque
+\texttt{lint} o \texttt{test-mobile} estuvieran en rojo -- no era la compuerta de calidad real que
+se pretendía. Se corrigió agregando esas dos dependencias faltantes. Una segunda revisión
+encontró que aún faltaba la más importante: \texttt{integration} -- el único \emph{job} que
+prueba contra el \emph{stack} real y no contra \emph{mocks} -- corría en \emph{paralelo} con
+\texttt{build-images} en vez de antes, así que una imagen podía publicarse aunque la integración
+real fallara. Se agregó también a \texttt{needs}, sin crear una dependencia circular porque
+\texttt{integration} construye sus propias imágenes en local (\texttt{docker compose up
+--build}), no depende de las que publica GHCR. La declaración final es
+\texttt{needs: [lint, test-backend, test-web, test-mobile, integration]}, para que ningún
+artefacto se publique sin que los cinco jobs de verificación pasen primero.
+
+\subsection{Depuración real del job \texttt{integration}}
+\label{sec:cicd-depuracion}
+
+Los primeros 6 \emph{jobs} pasaban de forma consistente desde su introducción. El séptimo,
+\texttt{integration}, falló en \emph{todas} las corridas sobre GitHub Actions durante varios
+días, pese a que el mismo \texttt{docker compose up -d --build} que ese \emph{job} ejecuta
+funcionaba sin problema en las máquinas de desarrollo del equipo. Esa asimetría -- funciona en
+local, falla siempre en el \emph{runner} -- fue la pista de que la causa era estructural, no una
+falla puntual. El equipo instaló la CLI oficial de GitHub (\texttt{gh}) para acceder al log real
+de cada paso (la API pública solo devuelve \enquote{\texttt{Process completed with exit code 1}},
+sin el comando que realmente falló), y diagnosticó tres causas raíz independientes, cada una
+confirmada con evidencia real antes de corregirla:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Candado circular en el healthcheck de CockroachDB.} El healthcheck de los 3
+        nodos usaba \texttt{/health?ready=1} -- que solo responde \texttt{OK} una vez que el
+        nodo ya pertenece a un clúster \emph{inicializado} -- mientras que \texttt{db-init} (quien
+        ejecuta \texttt{cockroach init}) esperaba a que ese mismo healthcheck pasara primero.
+        Nadie quedaba listo porque nadie los inicializaba, y nadie los inicializaba porque nadie
+        quedaba listo. En desarrollo esto no se manifestaba porque los volúmenes de Docker ya
+        traían un clúster inicializado de sesiones anteriores; un \emph{runner} de GitHub
+        Actions arranca siempre desde un volumen vacío, así que el candado se activaba sin
+        excepción. Un primer intento de aumentar el presupuesto de tiempo del healthcheck
+        \emph{no} resolvió el problema -- solo retrasó la falla de 70\,s a 3\,min 21\,s --,
+        confirmando que la causa era estructural y no de tiempo. Se corrigió cambiando el
+        healthcheck a \texttt{/health} (solo \emph{liveness}) y agregando reintentos reales
+        alrededor de \texttt{cockroach init}.
+  \item \textbf{Datos de demo del contrato Pact, nunca versionados.} El método \texttt{@State}
+        de la verificación del proveedor asumía datos de demo ya cargados por un script que
+        resultó no existir en ningún commit del repositorio -- solo había existido, sin
+        documentarlo como tal, en el volumen de Docker de quien lo escribió originalmente. Se
+        corrigió haciendo que el propio \texttt{@State} inserte esos datos por SQL directo, que
+        es precisamente para lo que existe ese mecanismo de Pact.
+  \item \textbf{Playwright solo instalaba Chromium.} \texttt{playwright.config.ts} define 3
+        proyectos (Chromium, Firefox, WebKit -- requisito de compatibilidad de esta entrega),
+        pero el paso de instalación del \emph{workflow} tenía el argumento
+        \texttt{chromium} agregado, restringiendo la instalación a un solo navegador. Se
+        corrigió quitando el argumento.
+\end{enumerate}
+
+Las tres correcciones se verificaron de punta a punta contra el \emph{stack} real -- nunca
+simuladas -- antes de subirlas, y el pipeline completo quedó en verde sobre un mismo commit. El
+patrón común a los tres problemas es el mismo: algo que \emph{parecía} funcionar porque la
+máquina de desarrollo conservaba un estado acumulado (un volumen ya inicializado, datos cargados
+a mano, un navegador ya instalado) que un entorno realmente limpio nunca reproduce por su cuenta.
+El detalle completo de cada diagnóstico, incluidos los registros reales y los intentos que no
+funcionaron, está en \texttt{docs/ci\_cd/informe\_ci\_cd.tex}.
+
+\subsection{Cobertura y complejidad ciclomática}
+
+La cobertura de \texttt{ticket-service}, medida con JaCoCo, alcanza el \textbf{81.1\,\%} de
+líneas del código propio, por encima del objetivo del 70\,\% que el proyecto se propuso desde la
+Entrega 3. Ese número no incluye el código generado automáticamente por \texttt{protobuf}/
+\texttt{grpc-java} a partir de \texttt{telemetry.proto} (\emph{getters}, \emph{setters} y
+constructores mecánicos sin lógica propia, que ninguna convención de pruebas exige cubrir a
+mano) — se excluye explícitamente en el \texttt{pom.xml} (perfil \texttt{coverage}), con un
+comentario que documenta por qué. Sin esa exclusión, ese código generado por sí solo diluía la
+cifra reportada de 59.3\,\% (antes de que \texttt{telemetry-service}/\texttt{CORREL} existieran)
+a un engañoso 42.7\,\%, contando en contra código que nadie prueba por convención en ningún
+proyecto Java real.
+
+Antes de escribir pruebas nuevas para esta entrega, el código propio (sin el generado) ya estaba
+en 64.4\,\%. Se identificaron con el propio reporte de JaCoCo las clases reales con mayor número
+de líneas sin cubrir — no una elección arbitraria — y se agregaron 31 pruebas unitarias nuevas
+(87 en total en el módulo, todas en verde) sobre, entre otras: \texttt{CorrelationService} (el
+orquestador de \texttt{CORREL}, que llegó a esta entrega prácticamente sin pruebas propias), los
+tres observadores concretos del patrón Observer (\texttt{EscalationLoggingObserver},
+\texttt{EscalationMetricsObserver}, \texttt{EscalationEventPublisherObserver} — cerrando un hueco
+real en un patrón que el propio manuscrito documenta como implementado), \texttt{
+GlobalExceptionHandler}, y el mapeo/adaptador de persistencia de \texttt{Incidencia}.
+
+La complejidad ciclomática promedio del mismo módulo, medida con la herramienta \texttt{lizard},
+es de \textbf{1.8}, muy por debajo del umbral de 10 — ninguna función individual supera siquiera
+el umbral de alarma de 15, resultado consistente con el refactor a métodos pequeños de la
+Sección~\ref{sec:hexagonal-e4}.

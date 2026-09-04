@@ -143,3 +143,5 @@ requiere tocar `EscalationScheduler` ni ninguno de los observadores existentes.
   problema de corrección (evaluar dos veces el mismo ticket es idempotente: el motivo de
   escalado se recalcula, no se acumula) pero sí de eficiencia si el número de réplicas crece;
   queda documentado como limitación conocida, no resuelto en esta entrega.
+  
+- Ver [ADR-0009](0009-nota-trazabilidad-commit-a74791c.md) para el desglose exacto de líneas/archivos del commit `a74791c` que introdujo este refactor, y su separación respecto de una limpieza accidental no relacionada con el diseño.

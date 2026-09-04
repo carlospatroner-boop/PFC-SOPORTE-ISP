@@ -2,7 +2,7 @@
 \label{sec:arquitectura}
 
 Esta sección documenta la arquitectura resultante tras la Entrega 4 en los tres niveles del
-modelo C4~\cite{martin2017clean}, y resume las decisiones registradas como \emph{Architectural
+modelo C4~\cite{brown2018c4model}, y resume las decisiones registradas como \emph{Architectural
 Decision Records} (ADR) que la sustentan.
 
 \subsection{Vista de contexto (C4 Nivel 1)}
@@ -171,7 +171,7 @@ en esta corrida de verificación.
 La Entrega 3 estableció (ADR-0004) una postura CAP/PACELC~\cite{brewer2012cap,abadi2012consistency}
 mixta por agregado de dominio: la creación de tickets prioriza disponibilidad (AP), mientras que
 los datos de SLA y facturación exigen consistencia fuerte (CP). CockroachDB no ofrece un modo
-``eventual'' configurable por tabla —su consistencia serializable por defecto, lograda mediante
+``eventual configurable por tabla —su consistencia serializable por defecto, lograda mediante
 consenso Raft~\cite{ongaro2014raft}, cubre el caso CP sin configuración adicional; la postura AP
 se aproxima evitando reintentos automáticos silenciosos en las operaciones críticas. Esta postura
 sigue vigente sin cambios en la Entrega 4: el refactor a arquitectura hexagonal reorganizó

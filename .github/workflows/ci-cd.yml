@@ -184,9 +184,17 @@ jobs:
   # ============================================================
   # 5. build-images: imagenes Docker de los 6 microservicios + apps/web, publicadas en GHCR.
   #    Solo en push (no en pull_request, para no llenar el registry de imagenes de prueba).
+  #    needs incluye los 5 jobs de verificacion (no solo test-backend/test-web): antes
+  #    publicaba igual aunque lint o test-mobile quedaran en rojo -- encontrado en una
+  #    auditoria externa del pipeline, no era una compuerta de calidad real como decia
+  #    el manuscrito (ver secciones/pruebas_cicd.tex). Una segunda auditoria encontro que
+  #    "integration" (el unico job que prueba contra el stack real, no mocks) corria en
+  #    PARALELO con este job en vez de antes -- se agrega tambien a needs, sin crear
+  #    dependencia circular porque integration construye sus propias imagenes localmente
+  #    via "docker compose up --build", no depende de las que publica GHCR.
   # ============================================================
   build-images:
-    needs: [test-backend, test-web]
+    needs: [lint, test-backend, test-web, test-mobile, integration]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

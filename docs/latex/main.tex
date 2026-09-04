@@ -16,12 +16,18 @@
 \usepackage{enumitem}
 \usepackage{float}
 
+% csquotes no esta disponible en esta instalacion de TeX Live -- se define \enquote a
+% mano con el metodo clasico de LaTeX (comilla-comilla de apertura, apostrofe-apostrofe
+% de cierre). Evita el conflicto de "..." con los shorthands de babel-spanish (mismo
+% bug real encontrado y corregido en docs/ci_cd/informe_ci_cd.tex).
+\newcommand{\enquote}[1]{``#1''}
+
 \hypersetup{
     colorlinks=true,
     linkcolor=blue!50!black,
     citecolor=blue!50!black,
     urlcolor=blue!50!black,
-    pdftitle={Capa de datos distribuida y pipeline analitico paralelo - Equipo ACC},
+    pdftitle={Cierre integral del PFC: aplicaciones web y movil, calidad y evaluacion experimental - Equipo ACC},
     pdfauthor={Carlos Carpio, Cristhian Pacheco, Robinson Cando, Jeremy Alvarez}
 }
 
@@ -52,33 +58,33 @@
 }
 \lstset{style=codigo}
 
-\newcommand{\seccionpagref}[1]{} % placeholder, no-op
-
-\title{\textbf{Capa de datos distribuida y pipeline anal\'itico paralelo}\\
-\large Sistema de Gesti\'on de Solicitudes de Soporte T\'ecnico de Internet\\
-\large Entrega 3 --- Aplicaciones Distribuidas (ISR-701)}
+\title{\textbf{Sistema de Gestión de Solicitudes de Soporte Técnico de Internet}\\
+\large Aplicación completa (web y móvil), calidad y evaluación experimental\\
+\large Entrega 4 --- Aplicaciones Distribuidas (ISR-701)}
 
 \author{
 Carlos Jos\'e Carpio Mendoza \and
 Cristhian Daniel Pacheco C\'ardenas \and
 Robinson Rodrigo Cando Moreno \and
-Jeremy \'Alvarez\\[1em]
+Jeremy Alexis \'Alvarez P\'arraga\\[1em]
 \normalsize Equipo ACC\\
-\normalsize Facultad de Ciencias de la Computaci\'on\\
+\normalsize Facultad de Ciencias de la Computaci\'on y Dise\~no Gr\'afico\\
+\normalsize Carrera de Ingenier\'ia en Software\\
 \normalsize Universidad T\'ecnica Estatal de Quevedo
 }
 
-\date{Julio 2026}
+\date{Septiembre 2026}
 
 \begin{document}
 
 \maketitle
 
-\input{secciones/resumen}
+\input{secciones/resumen_e4}
 
 \tableofcontents
 \newpage
 
+% ---------- Heredado de E1-E3, sin cambios de estructura ----------
 \input{secciones/introduccion}
 \input{secciones/trabajos_relacionados}
 \input{secciones/fundamento_teorico}
@@ -87,8 +93,21 @@ Jeremy \'Alvarez\\[1em]
 \input{secciones/cluster_verificacion}
 \input{secciones/pipeline_paralelo}
 \input{secciones/protocolo_resultados}
+
+% ---------- Nuevo de la Entrega 4 ----------
+\input{secciones/fundamento_teorico_e4}
+\input{secciones/arquitectura_sistema_e4}
+\input{secciones/aplicacion_web}
+\input{secciones/aplicacion_movil}
+\input{secciones/pruebas_cicd}
+\input{secciones/observabilidad}
+\input{secciones/evaluacion_iso25010}
+
+% ---------- Discusion y cierre (E3 + E4) ----------
 \input{secciones/discusion}
+\input{secciones/discusion_amenazas}
 \input{secciones/conclusiones}
+\input{secciones/conclusiones_e4}
 
 \bibliographystyle{ieeetr}
 \bibliography{referencias}

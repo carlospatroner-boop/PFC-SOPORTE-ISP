@@ -1,0 +1,90 @@
+\section{Conclusiones y trabajo futuro}
+\label{sec:conclusiones-e4}
+
+\subsection{Cierre del ciclo E1--E4}
+
+El proyecto recorrió, a lo largo de cuatro entregas, el ciclo completo de construcción de un
+sistema distribuido: análisis del dominio y prototipo de comunicación (E1), arquitectura de
+microservicios sobre Docker Compose (E2), persistencia distribuida real con particionado y
+tolerancia a fallos verificada experimentalmente, más un pipeline analítico paralelo (E3), y el
+cierre integral de esta entrega —dos clientes completos, refactor a arquitectura en capas con
+patrones de diseño reales, una pirámide de pruebas completa, un pipeline de CI/CD de siete
+\emph{jobs}, observabilidad de las tres señales, y una evaluación experimental de calidad contra
+ISO/IEC 25010. Ninguna pieza de las entregas anteriores se descartó: el mismo cluster
+CockroachDB, el mismo esquema de datos particionado, y el mismo pipeline de Spark de la Entrega 3
+siguen operando sin cambios detrás de la nueva capa de clientes y observabilidad. La
+Tabla~\ref{tab:trazabilidad-e1-e4} hace explícita esta progresión, entrega por entrega, con la
+evidencia concreta (ADR o sección del documento) que sustenta cada aporte.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Trazabilidad del ciclo E1--E4: qué aportó cada entrega y dónde queda la evidencia.}
+\label{tab:trazabilidad-e1-e4}
+\begin{tabular}{@{}p{1.1cm}p{6.4cm}p{5.6cm}@{}}
+\toprule
+\textbf{Entrega} & \textbf{Aporte arquitectónico} & \textbf{Evidencia} \\
+\midrule
+E1 & Definición del dominio ISP y primer prototipo monolítico con comunicación por
+     \emph{sockets}. & Sección~\ref{sec:introduccion} \\
+E2 & Descomposición en cinco microservicios (\texttt{auth}, \texttt{ticket}, \texttt{ai},
+     \texttt{notification}, \texttt{report}), REST + eventos Kafka, JWT/RBAC. &
+     Sección~\ref{sec:introduccion} \\
+E3 & Fragmentación horizontal sobre CockroachDB de 3 nodos con verificación formal, postura
+     CAP/PACELC mixta, pipeline analítico paralelo con Spark. & ADR-0003, ADR-0004,
+     Secciones~\ref{sec:diseno-esquema}, \ref{sec:pipeline-paralelo} \\
+E4 & Refactor a arquitectura hexagonal con 6 patrones GoF, apps web y móvil nativas, canal de
+     telemetría PE-U1 y correlación \texttt{CORREL} en Incidencias, pipeline de CI/CD de 7
+     \emph{jobs}, observabilidad de 3 señales, evaluación experimental ISO/IEC 25010. &
+     ADR-0005, ADR-0006, ADR-0007, ADR-0008, Secciones~\ref{sec:arquitectura-e4},
+     \ref{sec:web}, \ref{sec:movil}, \ref{sec:pruebas-cicd}, \ref{sec:observabilidad},
+     \ref{sec:iso25010} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\emph{Nota sobre PE-U1}: pese a que su nombre remite a la Entrega 1, se verificó contra el
+historial completo del repositorio que este canal de telemetría (sockets + gRPC + reloj de
+Lamport) nunca se construyó en ninguna entrega anterior --- se construyó por primera vez en esta
+entrega, junto con \texttt{CORREL} (ADR-0007, ADR-0008), y se documenta así explícitamente para
+no sugerir una continuidad que no existió.
+
+\subsection{Contribuciones concretas de esta entrega}
+
+\begin{itemize}[nosep]
+  \item Refactor verificable de \texttt{ticket-service} a cuatro capas con seis patrones GoF,
+        cada uno documentado con el problema real que resolvía antes del cambio; el mismo patrón
+        de capas se extendió a \texttt{auth-service} y \texttt{report-service} (Sección
+        \ref{sec:hexagonal-e4}), con alcance declarado explícitamente para los tres servicios que
+        quedaron fuera.
+  \item Dos aplicaciones cliente completas y funcionales (web y móvil) consumiendo la misma API a
+        través de un único \emph{gateway}.
+  \item Contratos consumidor-proveedor verificados en verde contra el sistema real, no contra
+        \emph{mocks} estáticos.
+  \item Un pipeline de CI/CD de siete \emph{jobs} que actúa como compuerta de calidad real.
+  \item Observabilidad de extremo a extremo con las tres señales correlacionadas por un
+        identificador común.
+  \item Una evaluación experimental honesta contra ISO/IEC 25010, que reporta tanto lo que
+        cumple el umbral objetivo como lo que no, con causa raíz identificada en cada caso.
+  \item Cobertura de pruebas de \texttt{ticket-service} en 81.1\,\% del código propio (por
+        encima del objetivo del 70\,\%), priorizando con el propio reporte de JaCoCo las clases
+        reales con mayor número de líneas sin cubrir.
+\end{itemize}
+
+\subsection{Trabajo futuro}
+
+Directamente derivado de las brechas reales encontradas en esta misma entrega (Secciones
+\ref{sec:pruebas-cicd}, \ref{sec:iso25010} y \ref{sec:discusion-e4}):
+
+\begin{enumerate}[nosep]
+  \item Obtener una licencia de CockroachDB (o migrar a CockroachDB Serverless) para levantar el
+        límite de transacciones concurrentes que hoy degrada la eficiencia y la fiabilidad bajo
+        carga real.
+  \item Agregar protección contra fuerza bruta (\emph{rate-limiting} o bloqueo temporal de cuenta)
+        en el inicio de sesión de \texttt{auth-service}.
+  \item Ejecutar el protocolo de evaluación ISO 25010 a escala completa (10 repeticiones, 5 y 10
+        minutos por escenario) una vez que el cronograma del equipo lo permita, siguiendo
+        exactamente la metodología ya validada a escala reducida en esta entrega.
+  \item Completar las pruebas instrumentadas de Android en un dispositivo/emulador real, y ampliar
+        su cobertura más allá del flujo de inicio de sesión.
+\end{enumerate}

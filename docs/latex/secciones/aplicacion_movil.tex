@@ -1,0 +1,93 @@
+\section{Aplicación móvil}
+\label{sec:movil}
+
+\subsection{Justificación cuantitativa de Android nativo}
+
+El Módulo C permite dos rutas para el cliente móvil obligatorio: Android nativo (Kotlin +
+Jetpack Compose) o multiplataforma (Flutter 3.x o React Native 0.74+). El Anexo B de la guía de
+esta entrega exige justificar esa elección con al menos dos criterios cuantitativos, no solo
+preferencia estética —conforme a lo discutido en la literatura sobre desarrollo de aplicaciones
+móviles~\cite{wasserman2010mobile,elkassas2017taxonomy,biornhansen2019crossplatform}. El cliente
+móvil de este proyecto es para técnicos de campo: usa cámara y geolocalización de forma continua
+durante la jornada, en dispositivos de gama variable asignados por la operadora. Se eligió
+\textbf{Android nativo con Kotlin + Jetpack Compose} (MVVM, inyección de dependencias manual),
+sustentado en dos mediciones directas sobre el proyecto ya construido (ADR-0006):
+
+\begin{enumerate}[nosep]
+  \item \textbf{Tamaño del artefacto instalable}: el APK de depuración pesa \textbf{11.06\,MB},
+        sin ningún motor de renderizado embebido adicional —Jetpack Compose compila a las mismas
+        vistas nativas de Android (\emph{bytecode} ART), a diferencia de un framework
+        multiplataforma que empaqueta su propio motor (Skia/Flutter engine, o el puente
+        JavaScript de React Native) dentro de cada instalación.
+  \item \textbf{Dependencias de terceros para las capacidades obligatorias}: cámara y
+        geolocalización se resuelven con \textbf{cero dependencias de interoperabilidad} —la
+        cámara usa \texttt{ActivityResultContracts.TakePicture} (parte del propio SDK de Android)
+        y la geolocalización una única dependencia oficial de Google
+        (\texttt{play-services-location}). Un framework multiplataforma necesitaría, en cambio,
+        un \emph{plugin} puente con la sobrecarga de serialización y el riesgo de mantenimiento
+        que eso implica.
+\end{enumerate}
+
+Como criterio cualitativo adicional: el backend del proyecto ya es JVM (Java 21 + Spring Boot),
+por lo que Kotlin comparte máquina virtual y herramientas de \emph{build} (Gradle) con el resto
+del equipo, reduciendo el salto conceptual frente a adoptar Dart o un puente nativo de JavaScript
+desde cero.
+
+\subsection{Arquitectura MVVM y modo sin conexión}
+
+Cada pantalla sigue el patrón \textbf{MVVM}: un \texttt{ViewModel} concentra el estado
+(\texttt{StateFlow}) y la lógica, mientras la vista en Jetpack Compose solo observa y dibuja. El
+listado de tickets asignados usa una caché local con Room, de forma que un técnico en campo sin
+cobertura de red siga viendo su carga de trabajo del día.
+
+\subsection{Capacidades del dispositivo}
+
+Se integran las dos capacidades obligatorias del Módulo C:
+
+\begin{itemize}[nosep]
+  \item \textbf{Cámara}: evidencia fotográfica del cierre de un ticket, capturada con
+        \texttt{ActivityResultContracts.TakePicture} y un \texttt{FileProvider} propio de la
+        aplicación (sin escribir a almacenamiento externo compartido).
+  \item \textbf{Geolocalización}: ubicación del cierre capturada con
+        \texttt{FusedLocationProviderClient}, solicitada solo en el momento del cierre, no como
+        rastreo continuo en segundo plano.
+\end{itemize}
+
+La Figura~\ref{fig:movil-capturas} muestra ambas capacidades reales en el emulador
+(\texttt{Medium\_Phone\_API\_36.0}), instalando el mismo APK de depuración que produce el
+\emph{job} \texttt{build-mobile-apk} de CI/CD: el listado (que además exhibe en vivo el modo sin
+conexión de la Sección anterior --el emulador arrancó con datos ya cacheados en Room, y la
+aplicación lo declara explícitamente en vez de mostrar una lista vacía o congelarse) y la pantalla
+de detalle con los botones reales \texttt{Tomar Foto} y \texttt{GPS Cierre}.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.47\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../../release/screenshots/mobile_01_lista.png}
+  \\ \footnotesize (a) Listado (modo sin conexión, datos cacheados con Room)
+\end{minipage}
+\hfill
+\begin{minipage}{0.47\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../../release/screenshots/mobile_02_detalle_orden.png}
+  \\ \footnotesize (b) Detalle: cámara y GPS de cierre
+\end{minipage}
+\caption{Capturas reales de \texttt{apps/mobile} en emulador Android (2026-09-03).}
+\label{fig:movil-capturas}
+\end{figure}
+
+La pantalla de detalle muestra además el identificador completo del ticket en un elemento de
+texto seleccionable —una decisión deliberada para poder demostrar, en una presentación en vivo,
+que la aplicación móvil y la aplicación web leen y escriben sobre el mismo backend real: cerrar
+un ticket desde el teléfono y encontrarlo actualizado en la consola web buscando por ese mismo
+identificador (Sección~\ref{sec:web}).
+
+\subsection{Pruebas}
+
+La capa de \texttt{ViewModel} tiene pruebas unitarias con JUnit 5 y \texttt{kotlinx-coroutines-test}
+(\texttt{LoginViewModelTest}). La prueba instrumentada de extremo a extremo exigida por el Módulo
+C (Espresso o Compose Testing) cubre el flujo de validación de formulario de inicio de sesión
+(\texttt{LoginScreenTest}, Compose Testing) contra la actividad real de la aplicación, sin
+depender de que el backend esté disponible —de forma estable en un pipeline de integración
+continua.

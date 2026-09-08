@@ -243,13 +243,14 @@ Ejecución fresca de toda la suite automatizada del proyecto el 2026-08-24, cont
 | Instrumentada (mobile) | `LoginScreenTest` (Compose Testing) | ⏳ no ejecutada (sin emulador conectado en este ciclo) |
 
 **174 de 174 pruebas ejecutadas en este ciclo pasaron (100%)**, sin contar las 2 instrumentadas
-de Android pendientes de correr en un emulador. Nota honesta sobre `svc-principal`: de sus 48
-pruebas, 47 pasan y 1 (`TicketRepositoryIntegrationTest`, con Testcontainers) no pudo ejecutarse
-en el entorno de verificación local usado para este documento por una limitación conocida de
-Docker-en-Docker en Docker Desktop para Windows (el contenedor Ryuk de Testcontainers no es
-alcanzable desde un Maven anidado) — no es una falla del código; ese mismo test ya corría en
-verde en el pipeline de CI (`ci-cd.yml`, job `test-backend`), que ejecuta Maven directo sobre el
-runner sin anidar Docker.
+de Android pendientes de correr en un emulador. Nota sobre `svc-principal`, actualizada el
+2026-09-07: la limitación de `TicketRepositoryIntegrationTest` (con Testcontainers) descrita
+antes era específica de correr Maven *anidado dentro de un contenedor Docker* (el contenedor
+Ryuk no alcanzaba el Docker del host en ese caso) — corriendo Maven directo sobre el host, tal
+como ya lo hace el pipeline de CI, el test corre y pasa sin problema: 87 pruebas ejecutadas, 0
+fallos, 0 errores (1 omitida, `TicketServiceProviderPactTest`, sin relación con esta limitación).
+El informe real de JaCoCo de esta corrida está en
+`docs/evidencias/jacoco-svc-principal/index.html`.
 
 ## 8. Amenazas a la validez
 

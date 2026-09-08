@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TicketJpaEntity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.persistence</a> &gt; <span class="el_source">TicketJpaEntity.java</span></div><h1>TicketJpaEntity.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.persistence;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Category;
+import ec.edu.uteq.soporte.ticketservice.domain.Priority;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketId;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
+import ec.edu.uteq.soporte.ticketservice.domain.Zone;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+/**
+ * Mapeo JPA real a la tabla particionada `tickets` de CockroachDB (fragmentacion horizontal
+ * por created_at -- ver ADR-0003 y db-cluster/scripts/init_db.sql). Antes del refactor de la
+ * Entrega 4, estas anotaciones vivian directamente en domain/Ticket.java; ahora esa clase es
+ * un POJO de dominio puro y esta es su unica contraparte con detalles de persistencia
+ * (Modulo A, item 2 de la guia de E4). La conversion entre ambas vive en TicketMapper.
+ */
+@Entity
+@Table(name = &quot;tickets&quot;)
+@IdClass(TicketId.class)
+@Getter
+<span class="nc" id="L35">@Setter</span>
+<span class="fc" id="L36">@NoArgsConstructor</span>
+<span class="fc" id="L37">@AllArgsConstructor</span>
+<span class="pc" id="L38">@Builder</span>
+public class TicketJpaEntity {
+
+    @Id
+    @Column(name = &quot;created_at&quot;, nullable = false)
+<span class="fc" id="L43">    private OffsetDateTime createdAt;</span>
+
+    @Id
+    @Column(name = &quot;id&quot;, nullable = false)
+<span class="fc" id="L47">    private UUID id;</span>
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;zone&quot;, nullable = false)
+<span class="fc" id="L51">    private Zone zone;</span>
+
+    @Column(name = &quot;client_id&quot;, nullable = false)
+<span class="fc" id="L54">    private UUID clientId;</span>
+
+    @Column(name = &quot;technician_id&quot;)
+<span class="fc" id="L57">    private UUID technicianId;</span>
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;category&quot;)
+<span class="fc" id="L61">    private Category category;</span>
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;priority&quot;)
+<span class="fc" id="L65">    private Priority priority;</span>
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;status&quot;, nullable = false)
+<span class="fc" id="L69">    private TicketStatus status;</span>
+
+    @Column(name = &quot;description&quot;)
+<span class="fc" id="L72">    private String description;</span>
+
+    @Column(name = &quot;sla_deadline&quot;)
+<span class="fc" id="L75">    private OffsetDateTime slaDeadline;</span>
+
+    @Column(name = &quot;resolved_at&quot;)
+<span class="fc" id="L78">    private OffsetDateTime resolvedAt;</span>
+
+    @Column(name = &quot;sla_breached&quot;)
+<span class="fc" id="L81">    private boolean slaBreached;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

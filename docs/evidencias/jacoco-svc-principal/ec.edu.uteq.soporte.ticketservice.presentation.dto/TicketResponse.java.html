@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TicketResponse.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.presentation.dto</a> &gt; <span class="el_source">TicketResponse.java</span></div><h1>TicketResponse.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.presentation.dto;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Category;
+import ec.edu.uteq.soporte.ticketservice.domain.Priority;
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
+import ec.edu.uteq.soporte.ticketservice.domain.Zone;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+<span class="nc" id="L12">public record TicketResponse(</span>
+        Zone zone,
+        UUID ticketId,
+        UUID clientId,
+        UUID technicianId,
+        Category category,
+        Priority priority,
+        TicketStatus status,
+        String description,
+        OffsetDateTime createdAt,
+        OffsetDateTime slaDeadline,
+        OffsetDateTime resolvedAt,
+        boolean slaBreached
+) {
+    public static TicketResponse from(Ticket t) {
+<span class="nc" id="L27">        return new TicketResponse(</span>
+<span class="nc" id="L28">                t.getZone(), t.getId(), t.getClientId(), t.getTechnicianId(),</span>
+<span class="nc" id="L29">                t.getCategory(), t.getPriority(), t.getStatus(), t.getDescription(),</span>
+<span class="nc" id="L30">                t.getCreatedAt(), t.getSlaDeadline(), t.getResolvedAt(), t.isSlaBreached()</span>
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

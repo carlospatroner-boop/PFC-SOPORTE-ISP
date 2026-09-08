@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TicketClassificationListener.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.messaging</a> &gt; <span class="el_source">TicketClassificationListener.java</span></div><h1>TicketClassificationListener.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.messaging;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import ec.edu.uteq.soporte.ticketservice.domain.Category;
+import ec.edu.uteq.soporte.ticketservice.domain.Priority;
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketRepository;
+import ec.edu.uteq.soporte.ticketservice.domain.event.TicketClassifiedEvent;
+import ec.edu.uteq.soporte.ticketservice.domain.policy.ClassifiedSlaPolicy;
+import ec.edu.uteq.soporte.ticketservice.domain.policy.SlaPolicy;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+
+import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Adaptador de entrada (inbound) del otro lado de la Saga por coreografia (ver
+ * application/command/CreateTicketHandler): ai-service clasifica un ticket de forma asincrona
+ * y publica el resultado en &quot;ticket.classified&quot;. Este listener lo consume y completa
+ * category/priority, que hasta este momento quedan en null.
+ *
+ * Recalcula el SLA con la {@link ClassifiedSlaPolicy} (patron Strategy, inyectada por tipo
+ * concreto ya que este es precisamente el punto que decide &quot;ya se conoce la prioridad real,
+ * usa esa politica&quot;) en vez del mapa hardcodeado que tenia antes del refactor.
+ */
+@Component
+public class TicketClassificationListener {
+
+<span class="fc" id="L31">    private static final Logger LOGGER = Logger.getLogger(TicketClassificationListener.class.getName());</span>
+
+    private final TicketRepository ticketRepository;
+    private final ObjectMapper objectMapper;
+    private final SlaPolicy classifiedSlaPolicy;
+
+    public TicketClassificationListener(
+            TicketRepository ticketRepository,
+            ObjectMapper objectMapper,
+<span class="fc" id="L40">            ClassifiedSlaPolicy classifiedSlaPolicy) {</span>
+<span class="fc" id="L41">        this.ticketRepository = ticketRepository;</span>
+<span class="fc" id="L42">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L43">        this.classifiedSlaPolicy = classifiedSlaPolicy;</span>
+<span class="fc" id="L44">    }</span>
+
+    @KafkaListener(topics = &quot;ticket.classified&quot;, groupId = &quot;ticket-service&quot;)
+    public void onTicketClassified(String payload) {
+        try {
+<span class="fc" id="L49">            TicketClassifiedEvent event = objectMapper.readValue(payload, TicketClassifiedEvent.class);</span>
+<span class="fc" id="L50">            apply(event);</span>
+<span class="fc" id="L51">        } catch (Exception e) {</span>
+<span class="fc" id="L52">            LOGGER.log(Level.WARNING, &quot;No se pudo procesar un mensaje de ticket.classified: &quot; + payload, e);</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">    }</span>
+
+    private void apply(TicketClassifiedEvent event) {
+<span class="fc" id="L57">        UUID id = UUID.fromString(event.ticketId());</span>
+<span class="fc" id="L58">        Ticket ticket = ticketRepository.findByTicketId(id).orElse(null);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (ticket == null) {</span>
+<span class="fc" id="L60">            LOGGER.warning(&quot;ticket.classified referencia un ticket inexistente: &quot; + event.ticketId());</span>
+<span class="fc" id="L61">            return;</span>
+        }
+
+<span class="fc" id="L64">        Category category = parseEnumOrNull(Category.class, event.category());</span>
+<span class="fc" id="L65">        Priority priority = parseEnumOrNull(Priority.class, event.priority());</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (category != null) {</span>
+<span class="fc" id="L67">            ticket.setCategory(category);</span>
+        }
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (priority != null) {</span>
+<span class="fc" id="L70">            ticket.setPriority(priority);</span>
+<span class="fc" id="L71">            ticket.setSlaDeadline(ticket.getCreatedAt().plus(classifiedSlaPolicy.slaFor(priority)));</span>
+        }
+<span class="fc" id="L73">        ticketRepository.save(ticket);</span>
+<span class="fc" id="L74">    }</span>
+
+    private &lt;E extends Enum&lt;E&gt;&gt; E parseEnumOrNull(Class&lt;E&gt; enumType, String value) {
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L78">            return null;</span>
+        }
+        try {
+<span class="fc" id="L81">            return Enum.valueOf(enumType, value);</span>
+<span class="nc" id="L82">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L83">            LOGGER.warning(&quot;Valor desconocido '&quot; + value + &quot;' para &quot; + enumType.getSimpleName());</span>
+<span class="nc" id="L84">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

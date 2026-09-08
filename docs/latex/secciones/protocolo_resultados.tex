@@ -127,21 +127,26 @@ independiente en \texttt{docs/experimentos/resultados/raw.csv}.
 
 \subsubsection{Contraste de H1}
 
-Antes de la prueba paramétrica se verificó la normalidad de las diferencias emparejadas
-(baseline $-$ Spark \texttt{local[8]}) con Shapiro--Wilk: $W=0.963$, $p=0.835$, por lo que no se
-rechaza normalidad y corresponde la prueba \emph{t} pareada. El resultado es
-$t=-47.19$, $p \approx 5.02 \times 10^{-10}$, con una diferencia media de $-103.94$\,s
-(baseline $-$ Spark).
+Con $n=8$ muestras válidas por nivel, el supuesto de normalidad no puede sostenerse de forma
+confiable aunque Shapiro--Wilk no la rechace (diferencias baseline $-$ Spark \texttt{local[8]}:
+$W=0.963$, $p=0.835$, diagnóstico informativo, no criterio de selección del test): se usa por
+tanto una prueba no paramétrica, Mann--Whitney U, más el tamaño del efecto $\hat{A}_{12}$ de
+Vargha--Delaney~\cite{vargha2000critique}, reportando significancia y dirección del efecto por
+separado en vez de conflarlas en una sola conclusión. El resultado es $U=0$,
+$p \approx 1.55 \times 10^{-4}$, con una diferencia media de $-103.94$\,s (baseline $-$ Spark) y
+$\hat{A}_{12}=0.0$ —separación completa: las 8 corridas del baseline fueron, cada una, más rápidas
+que las 8 corridas de Spark \texttt{local[8]}.
 
-El signo de esta diferencia es la conclusión central del experimento: \textbf{no se rechaza H0 en
-el sentido en que fue formulada H1} —el pipeline paralelo con $N=8$ núcleos no resultó más rápido
-que el baseline secuencial—, pero la diferencia entre ambos es altamente significativa
-($p \ll 0.05$) en la dirección \emph{opuesta}: el baseline en pandas fue, en promedio, casi 5 veces
-más rápido que Spark incluso en su configuración de mayor paralelismo. Reportar esto tal como
+La conclusión central del experimento es que \textbf{H0 se rechaza} —hay una diferencia
+altamente significativa entre ambas configuraciones— \textbf{pero en la dirección opuesta a la
+hipotizada en H1}: el pipeline paralelo con $N=8$ núcleos no resultó más rápido que el baseline
+secuencial, sino notablemente más lento. El baseline en pandas fue, en promedio, casi 5 veces más
+rápido que Spark incluso en su configuración de mayor paralelismo. Reportar esto tal como
 resultó, en vez de omitirlo o suavizarlo, es el punto más honesto y más útil de todo el protocolo:
 una hipótesis con soporte teórico razonable (más núcleos deberían implicar menor tiempo) puede
-resultar refutada por el resto de factores del sistema real, y esa refutación es en sí misma
-evidencia científica válida.
+resultar refutada por el resto de factores del sistema real, y esa refutación —con su dirección y
+su magnitud correctamente reportadas, no como una ausencia de diferencia— es en sí misma evidencia
+científica válida.
 
 \subsubsection{Por qué el baseline ganó: interpretación}
 

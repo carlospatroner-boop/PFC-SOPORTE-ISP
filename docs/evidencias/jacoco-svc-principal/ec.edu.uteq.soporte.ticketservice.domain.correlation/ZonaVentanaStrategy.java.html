@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZonaVentanaStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.domain.correlation</a> &gt; <span class="el_source">ZonaVentanaStrategy.java</span></div><h1>ZonaVentanaStrategy.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.domain.correlation;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Incidencia;
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import org.springframework.stereotype.Component;
+
+/**
+ * CORREL=c1: agrupa por zona y ventana deslizante. Si ya existe una Incidencia abierta en la
+ * misma zona dentro de la ventana (candidatas ya filtradas por IncidenciaRepository antes de
+ * llegar aqui), el ticket se une a la mas reciente; si no hay ninguna, abre una nueva.
+ *
+ * &lt;p&gt;Deliberadamente ciega a la telemetria (a diferencia de c2): agrupa por la sola coincidencia
+ * de zona+tiempo, sin corroborar que realmente este pasando algo ahi. Esto es a proposito --
+ * es exactamente lo que el Escenario 4 (dos averias simultaneas) del protocolo experimental
+ * pone a prueba: agrupar solo por zona+ventana puede fundir dos averias distintas en una.
+ */
+@Component(&quot;c1&quot;)
+<span class="fc" id="L21">public class ZonaVentanaStrategy implements CorrelationStrategy {</span>
+
+    @Override
+    public Incidencia correlacionar(Ticket ticket, List&lt;Incidencia&gt; incidenciasAbiertasEnZona) {
+<span class="fc" id="L25">        return incidenciasAbiertasEnZona.stream()</span>
+<span class="fc" id="L26">                .max(Comparator.comparing(Incidencia::getCreatedAt))</span>
+<span class="fc" id="L27">                .map(existente -&gt; unir(existente, ticket))</span>
+<span class="fc" id="L28">                .orElseGet(() -&gt; abrirNueva(ticket));</span>
+    }
+
+    private Incidencia unir(Incidencia existente, Ticket ticket) {
+<span class="fc" id="L32">        existente.getTicketIds().add(ticket.getId());</span>
+<span class="fc" id="L33">        return existente;</span>
+    }
+
+    private Incidencia abrirNueva(Ticket ticket) {
+<span class="fc" id="L37">        return Incidencia.builder()</span>
+<span class="fc" id="L38">                .zone(ticket.getZone())</span>
+<span class="fc" id="L39">                .createdAt(ticket.getCreatedAt())</span>
+<span class="fc" id="L40">                .correlMode(&quot;c1&quot;)</span>
+<span class="fc" id="L41">                .ticketIds(new HashSet&lt;&gt;(List.of(ticket.getId())))</span>
+<span class="fc" id="L42">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

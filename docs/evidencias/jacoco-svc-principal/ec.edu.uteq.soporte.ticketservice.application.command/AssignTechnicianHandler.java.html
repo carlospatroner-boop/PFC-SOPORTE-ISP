@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssignTechnicianHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.application.command</a> &gt; <span class="el_source">AssignTechnicianHandler.java</span></div><h1>AssignTechnicianHandler.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.application.command;
+
+import ec.edu.uteq.soporte.ticketservice.application.TicketAuthorization;
+import ec.edu.uteq.soporte.ticketservice.application.TicketNotFoundException;
+import ec.edu.uteq.soporte.ticketservice.application.TicketWriter;
+import ec.edu.uteq.soporte.ticketservice.domain.EventPublisher;
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketRepository;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
+import ec.edu.uteq.soporte.ticketservice.domain.event.TicketAssignedEvent;
+import org.springframework.stereotype.Component;
+
+@Component
+public class AssignTechnicianHandler implements TicketCommandHandler&lt;AssignTechnicianCommand, Ticket&gt; {
+
+    private static final String TOPIC_TICKET_ASSIGNED = &quot;ticket.assigned&quot;;
+
+    private final TicketRepository ticketRepository;
+    private final TicketAuthorization authorization;
+    private final TicketWriter ticketWriter;
+    private final EventPublisher eventPublisher;
+
+    public AssignTechnicianHandler(
+            TicketRepository ticketRepository,
+            TicketAuthorization authorization,
+            TicketWriter ticketWriter,
+<span class="fc" id="L27">            EventPublisher eventPublisher) {</span>
+<span class="fc" id="L28">        this.ticketRepository = ticketRepository;</span>
+<span class="fc" id="L29">        this.authorization = authorization;</span>
+<span class="fc" id="L30">        this.ticketWriter = ticketWriter;</span>
+<span class="fc" id="L31">        this.eventPublisher = eventPublisher;</span>
+<span class="fc" id="L32">    }</span>
+
+    @Override
+    public Ticket handle(AssignTechnicianCommand command) {
+<span class="fc" id="L36">        Ticket ticket = ticketRepository.findByTicketId(command.ticketId())</span>
+<span class="pc" id="L37">                .orElseThrow(() -&gt; new TicketNotFoundException(command.ticketId()));</span>
+<span class="fc" id="L38">        authorization.assertCanManage(ticket, command.role(), command.authZone());</span>
+
+<span class="fc" id="L40">        ticket.setTechnicianId(command.technicianId());</span>
+<span class="fc" id="L41">        ticket.setStatus(TicketStatus.ASIGNADO);</span>
+<span class="fc" id="L42">        Ticket saved = ticketWriter.saveWithRetry(ticket);</span>
+<span class="fc" id="L43">        publishAssigned(saved);</span>
+<span class="fc" id="L44">        return saved;</span>
+    }
+
+    private void publishAssigned(Ticket ticket) {
+<span class="fc" id="L48">        TicketAssignedEvent event = new TicketAssignedEvent(</span>
+<span class="fc" id="L49">                ticket.getId().toString(), ticket.getZone().name(), ticket.getTechnicianId().toString());</span>
+<span class="fc" id="L50">        eventPublisher.publish(TOPIC_TICKET_ASSIGNED, event.ticketId(), event);</span>
+<span class="fc" id="L51">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

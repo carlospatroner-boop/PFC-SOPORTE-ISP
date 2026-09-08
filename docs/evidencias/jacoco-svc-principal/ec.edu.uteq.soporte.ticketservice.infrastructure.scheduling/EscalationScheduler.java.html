@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EscalationScheduler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.scheduling</a> &gt; <span class="el_source">EscalationScheduler.java</span></div><h1>EscalationScheduler.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.scheduling;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketRepository;
+import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
+import ec.edu.uteq.soporte.ticketservice.domain.escalation.EscalationChain;
+import ec.edu.uteq.soporte.ticketservice.domain.escalation.EscalationObserver;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Stream;
+
+/**
+ * Adaptador que activa periodicamente la cadena de escalado (patron Chain of
+ * Responsibility, ver domain/escalation/). Antes del refactor de la Entrega 4 no existia
+ * ningun camino que llevara un ticket al estado ESCALADO -- esta pieza es la que lo hace
+ * real: cada 5 minutos revisa los tickets todavia activos y aplica la cadena.
+ *
+ * Tambien actua como el &quot;sujeto&quot; del patron Observer (ver domain/escalation/EscalationObserver):
+ * no decide QUE pasa cuando un ticket se escala, solo notifica a cada observador registrado
+ * como bean de Spring. Los observadores concretos (log, metrica, evento de integracion) viven
+ * en infrastructure/ y se pueden agregar o quitar sin tocar esta clase.
+ */
+@Component
+public class EscalationScheduler {
+
+<span class="fc" id="L31">    private static final Logger LOGGER = Logger.getLogger(EscalationScheduler.class.getName());</span>
+<span class="fc" id="L32">    private static final List&lt;TicketStatus&gt; ESTADOS_ACTIVOS =</span>
+<span class="fc" id="L33">            List.of(TicketStatus.NUEVO, TicketStatus.ASIGNADO, TicketStatus.EN_PROGRESO);</span>
+
+    private final TicketRepository ticketRepository;
+    private final EscalationChain escalationChain;
+    private final List&lt;EscalationObserver&gt; observers;
+
+    public EscalationScheduler(
+<span class="fc" id="L40">            TicketRepository ticketRepository, EscalationChain escalationChain, List&lt;EscalationObserver&gt; observers) {</span>
+<span class="fc" id="L41">        this.ticketRepository = ticketRepository;</span>
+<span class="fc" id="L42">        this.escalationChain = escalationChain;</span>
+<span class="fc" id="L43">        this.observers = observers;</span>
+<span class="fc" id="L44">    }</span>
+
+    @Scheduled(fixedDelay = 5, timeUnit = java.util.concurrent.TimeUnit.MINUTES)
+    public void evaluarEscalados() {
+<span class="fc" id="L48">        List&lt;Ticket&gt; activos = ESTADOS_ACTIVOS.stream()</span>
+<span class="fc" id="L49">                .flatMap(status -&gt; Stream.of(ticketRepository.findByStatus(status)))</span>
+<span class="fc" id="L50">                .flatMap(List::stream)</span>
+<span class="fc" id="L51">                .toList();</span>
+
+<span class="fc" id="L53">        int escalados = 0;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (Ticket ticket : activos) {</span>
+<span class="fc" id="L55">            Optional&lt;String&gt; motivo = escalationChain.evaluate(ticket);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            if (motivo.isPresent()) {</span>
+<span class="fc" id="L57">                ticket.setStatus(TicketStatus.ESCALADO);</span>
+<span class="fc" id="L58">                Ticket saved = ticketRepository.save(ticket);</span>
+<span class="fc" id="L59">                escalados++;</span>
+<span class="fc" id="L60">                notifyObservers(saved, motivo.get());</span>
+            }
+<span class="fc" id="L62">        }</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (escalados &gt; 0) {</span>
+<span class="fc" id="L64">            LOGGER.log(Level.INFO, &quot;Evaluacion de escalado: {0} ticket(s) escalado(s) de {1} revisados&quot;,</span>
+<span class="fc" id="L65">                    new Object[]{escalados, activos.size()});</span>
+        }
+<span class="fc" id="L67">    }</span>
+
+    // Un observador que falla (p.ej. Kafka abajo) no debe impedir que los demas se
+    // ejecuten ni que el escalado ya persistido se pierda -- el guardado en BD ya
+    // ocurrio antes de notificar.
+    private void notifyObservers(Ticket ticket, String motivo) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (EscalationObserver observer : observers) {</span>
+            try {
+<span class="fc" id="L75">                observer.onTicketEscalated(ticket, motivo);</span>
+<span class="fc" id="L76">            } catch (Exception e) {</span>
+<span class="fc" id="L77">                LOGGER.log(Level.WARNING, &quot;Observador de escalado fallo para ticket &quot; + ticket.getId(), e);</span>
+<span class="fc" id="L78">            }</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

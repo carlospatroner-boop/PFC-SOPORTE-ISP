@@ -1,13 +1,15 @@
 {
   "hipotesis": "H1: el pipeline paralelo (N=8) tiene menor tiempo medio que el baseline secuencial",
-  "shapiro_wilk": {
-    "estadistico": 0.9626691220624594,
-    "p_valor": 0.8351089285395501,
-    "normal": true
+  "shapiro_wilk_diagnostico": {
+    "estadistico": 0.9626684400796167,
+    "p_valor": 0.8351026549205149,
+    "normal": true,
+    "nota": "diagnostico informativo; no se usa para elegir el test dado n=8 por grupo"
   },
-  "prueba_usada": "prueba t pareada (t-test relacionado)",
-  "estadistico": -47.19281708092826,
-  "p_valor": 5.016534037138421e-10,
-  "diferencia_media_s": -103.9409271102486,
-  "conclusion": "no se rechaza H0 (sin diferencia significativa al 95%)"
+  "prueba_usada": "Mann-Whitney U (bilateral)",
+  "estadistico_u": 0.0,
+  "p_valor": 0.0001554001554001554,
+  "tamano_efecto_vargha_delaney_a": 0.0,
+  "diferencia_media_s": -103.94092500000001,
+  "conclusion": "H0 se rechaza (diferencia altamente significativa), pero en direccion opuesta a la hipotizada en H1: el baseline secuencial fue mas rapido que Spark local[8], no al reves. H1 no se sostiene."
 }

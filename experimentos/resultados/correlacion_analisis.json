@@ -1,0 +1,66 @@
+{
+  "inicio_utc": "2026-09-08T02:43:54Z",
+  "repeticiones_por_condicion": 5,
+  "escenarios": {
+    "Esc-2_averia_masiva": {
+      "abonados": 20,
+      "zonas": [
+        "QUEVEDO_CENTRO"
+      ]
+    },
+    "Esc-3_averia_mayor": {
+      "abonados": 60,
+      "zonas": [
+        "QUEVEDO_CENTRO"
+      ]
+    },
+    "Esc-4_dos_averias_simultaneas": {
+      "abonados": 20,
+      "zonas": [
+        "QUEVEDO_CENTRO",
+        "QUEVEDO_NORTE"
+      ]
+    }
+  },
+  "por_modo": {
+    "c0": {
+      "n": 20,
+      "precision_media": 1.0,
+      "precision_mediana": 1.0,
+      "exhaustividad_media": 0.0417,
+      "exhaustividad_mediana": 0.05,
+      "incidencias_efectivas_media": 30.0
+    },
+    "c1": {
+      "n": 20,
+      "precision_media": 1.0,
+      "precision_mediana": 1.0,
+      "exhaustividad_media": 1.0,
+      "exhaustividad_mediana": 1.0,
+      "incidencias_efectivas_media": 1.0
+    },
+    "c2": {
+      "n": 20,
+      "precision_media": 1.0,
+      "precision_mediana": 1.0,
+      "exhaustividad_media": 1.0,
+      "exhaustividad_mediana": 1.0,
+      "incidencias_efectivas_media": 1.0
+    }
+  },
+  "contraste_c2_vs_c0_exhaustividad": {
+    "prueba": "Mann-Whitney U (bilateral)",
+    "estadistico_u": 400.0,
+    "p_valor": 2.578045952721565e-09,
+    "vargha_delaney_a_c2_mayor_c0": 1.0
+  },
+  "fusion_erronea_esc4": {
+    "n_corridas": 30,
+    "fusiones_observadas": 0,
+    "ic95_binomial": [
+      0.0,
+      0.0
+    ],
+    "nota": "La fusion cruzada de zona es estructuralmente imposible en esta implementacion (la correlacion filtra por zona antes de agrupar); 0 observadas es el resultado esperado y valida el particionado por zona, no una ausencia de prueba."
+  }
+}

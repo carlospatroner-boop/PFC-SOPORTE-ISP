@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CorrelationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.application.correlation</a> &gt; <span class="el_source">CorrelationService.java</span></div><h1>CorrelationService.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.application.correlation;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Incidencia;
+import ec.edu.uteq.soporte.ticketservice.domain.IncidenciaRepository;
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import ec.edu.uteq.soporte.ticketservice.domain.correlation.CorrelationStrategy;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+/**
+ * Orquesta la correlacion de un ticket nuevo en una Incidencia (Adicion 1 de la Ampliacion del
+ * Modulo G, equipo ACC -- ver docs/adr/0008-correl-incidencias.md). Spring inyecta
+ * automaticamente un Map con TODOS los beans que implementan CorrelationStrategy, con el
+ * nombre del bean como clave -- por eso las 3 implementaciones estan anotadas
+ * {@code @Component(&quot;c0&quot;)}/{@code &quot;c1&quot;}/{@code &quot;c2&quot;}: es exactamente el valor que puede traer la
+ * variable de entorno {@code CORREL}.
+ *
+ * &lt;p&gt;Se resuelve la estrategia activa UNA sola vez al construir este bean (CORREL no cambia en
+ * caliente). Cualquier fallo durante la correlacion (incluida la caida del canal de telemetria
+ * en modo c2) se atrapa y se registra, pero NUNCA revierte ni bloquea la creacion del ticket --
+ * mismo principio que ya aplica el publish de Kafka (ver ADR-0004 y CreateTicketHandler).
+ */
+@Component
+public class CorrelationService {
+
+<span class="fc" id="L31">    private static final Logger LOGGER = Logger.getLogger(CorrelationService.class.getName());</span>
+
+    private final CorrelationStrategy estrategiaActiva;
+    private final IncidenciaRepository incidenciaRepository;
+    private final long ventanaMinutos;
+
+    public CorrelationService(
+            Map&lt;String, CorrelationStrategy&gt; estrategias,
+            IncidenciaRepository incidenciaRepository,
+            @Value(&quot;${correlation.mode:c0}&quot;) String correlMode,
+<span class="fc" id="L41">            @Value(&quot;${correlation.window-minutes:15}&quot;) long ventanaMinutos) {</span>
+<span class="fc" id="L42">        CorrelationStrategy resuelta = estrategias.get(correlMode);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (resuelta == null) {</span>
+<span class="fc" id="L44">            throw new IllegalStateException(</span>
+                    &quot;CORREL='&quot; + correlMode + &quot;' no coincide con ninguna estrategia registrada &quot;
+<span class="fc" id="L46">                            + &quot;(valores validos: &quot; + estrategias.keySet() + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L48">        this.estrategiaActiva = resuelta;</span>
+<span class="fc" id="L49">        this.incidenciaRepository = incidenciaRepository;</span>
+<span class="fc" id="L50">        this.ventanaMinutos = ventanaMinutos;</span>
+<span class="fc" id="L51">        LOGGER.info(&quot;CorrelationService activo con CORREL=&quot; + correlMode + &quot;, ventana=&quot; + ventanaMinutos + &quot;min&quot;);</span>
+<span class="fc" id="L52">    }</span>
+
+    public void correlacionar(Ticket ticket) {
+        try {
+<span class="fc" id="L56">            OffsetDateTime desde = ticket.getCreatedAt().minusMinutes(ventanaMinutos);</span>
+<span class="fc" id="L57">            List&lt;Incidencia&gt; candidatas = incidenciaRepository.findByZoneAndCreatedAtAfter(ticket.getZone(), desde);</span>
+<span class="fc" id="L58">            Incidencia resultado = estrategiaActiva.correlacionar(ticket, candidatas);</span>
+<span class="fc" id="L59">            incidenciaRepository.save(resultado);</span>
+<span class="fc" id="L60">        } catch (Exception e) {</span>
+            // Nunca debe tumbar ni revertir la creacion del ticket -- ver ADR-0004.
+<span class="fc" id="L62">            LOGGER.log(Level.WARNING, &quot;No se pudo correlacionar el ticket &quot; + ticket.getId(), e);</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

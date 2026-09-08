@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TicketId.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.domain</a> &gt; <span class="el_source">TicketId.java</span></div><h1>TicketId.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.domain;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+/**
+ * Clave primaria compuesta (created_at, id) de Ticket, requerida por JPA
+ * (@IdClass) para reflejar la clave primaria real de la tabla en CockroachDB:
+ *   PRIMARY KEY (created_at, id)
+ * definida en db-cluster/scripts/init_db.sql. &quot;created_at&quot; debe ser el primer
+ * componente para que el PARTITION BY RANGE (created_at) sea efectivo (ver
+ * ADR-0003). La aplicacion casi nunca busca un ticket por esta clave completa --
+ * el punto de acceso real es TicketRepository.findByTicketId(UUID), que usa el
+ * indice unico secundario sobre &quot;id&quot; (ver Ticket.java).
+ */
+<span class="nc bnc" id="L21" title="All 22 branches missed.">@Data</span>
+<span class="fc" id="L22">@NoArgsConstructor</span>
+<span class="nc" id="L23">@AllArgsConstructor</span>
+public class TicketId implements Serializable {
+<span class="nc" id="L25">    private OffsetDateTime createdAt;</span>
+<span class="nc" id="L26">    private UUID id;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

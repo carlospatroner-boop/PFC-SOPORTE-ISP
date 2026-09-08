@@ -3,18 +3,12 @@
 
 \subsection{Esquema físico}
 
-La Figura~\ref{fig:c4-nivel2} sitúa la capa de datos dentro de la arquitectura completa del
-sistema: los cinco microservicios heredados de la Entrega 2 no cambian de contrato, mientras que
-el clúster de CockroachDB (fragmentado en esta entrega) y el pipeline de Spark (componente nuevo)
-se destacan explícitamente.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{figuras/c4-nivel2.png}
-\caption{Diagrama de contenedores (C4 Nivel 2) del sistema tras la Entrega 3. Ámbar: componente
-fragmentado/refactorizado en E3. Verde azulado: componente nuevo en E3.}
-\label{fig:c4-nivel2}
-\end{figure}
+La ubicación de la capa de datos dentro de la arquitectura completa del sistema —incluidos el
+\texttt{api-gateway}, las aplicaciones cliente y \texttt{telemetry-service}, ya no solo los cinco
+microservicios de la Entrega 2— se muestra en la Figura~\ref{fig:c4-nivel2} de la
+Sección~\ref{sec:arquitectura-e4}. Esta sección se concentra en el diseño interno de esa capa: la
+fragmentación del clúster de CockroachDB (rediseñada en esta entrega) y el pipeline de Spark que
+la consume.
 
 El diagrama entidad-relación completo de \texttt{ticket\_db} —la base propia de
 \texttt{ticket-service} dentro del clúster de tres nodos de CockroachDB— se documenta en

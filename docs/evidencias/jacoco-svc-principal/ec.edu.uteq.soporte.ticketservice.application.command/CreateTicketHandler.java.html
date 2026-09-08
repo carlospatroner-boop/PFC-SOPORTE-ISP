@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateTicketHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.application.command</a> &gt; <span class="el_source">CreateTicketHandler.java</span></div><h1>CreateTicketHandler.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.application.command;
+
+import ec.edu.uteq.soporte.ticketservice.application.TicketAuthorization;
+import ec.edu.uteq.soporte.ticketservice.application.TicketWriter;
+import ec.edu.uteq.soporte.ticketservice.application.correlation.CorrelationService;
+import ec.edu.uteq.soporte.ticketservice.domain.EventPublisher;
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+import ec.edu.uteq.soporte.ticketservice.domain.event.TicketCreatedEvent;
+import ec.edu.uteq.soporte.ticketservice.domain.factory.TicketFactory;
+import org.springframework.stereotype.Component;
+
+/**
+ * Crea un ticket en estado NUEVO, sin categoria ni prioridad todavia: en la arquitectura
+ * completa del PFC (Saga por coreografia), esos campos los completa ai-service de forma
+ * asincrona via Kafka al consumir el evento ticket.created (ver
+ * infrastructure/messaging/TicketClassificationListener). Este manejador, por ahora, solo
+ * persiste el ticket y deja pendiente esa clasificacion.
+ */
+@Component
+public class CreateTicketHandler implements TicketCommandHandler&lt;CreateTicketCommand, Ticket&gt; {
+
+    private static final String TOPIC_TICKET_CREATED = &quot;ticket.created&quot;;
+
+    private final TicketAuthorization authorization;
+    private final TicketFactory ticketFactory;
+    private final TicketWriter ticketWriter;
+    private final EventPublisher eventPublisher;
+    private final CorrelationService correlationService;
+
+    public CreateTicketHandler(
+            TicketAuthorization authorization,
+            TicketFactory ticketFactory,
+            TicketWriter ticketWriter,
+            EventPublisher eventPublisher,
+<span class="fc" id="L35">            CorrelationService correlationService) {</span>
+<span class="fc" id="L36">        this.authorization = authorization;</span>
+<span class="fc" id="L37">        this.ticketFactory = ticketFactory;</span>
+<span class="fc" id="L38">        this.ticketWriter = ticketWriter;</span>
+<span class="fc" id="L39">        this.eventPublisher = eventPublisher;</span>
+<span class="fc" id="L40">        this.correlationService = correlationService;</span>
+<span class="fc" id="L41">    }</span>
+
+    @Override
+    public Ticket handle(CreateTicketCommand command) {
+<span class="fc" id="L45">        authorization.assertCanCreate(command.role());</span>
+
+<span class="fc" id="L47">        Ticket ticket = ticketFactory.crearNuevo(</span>
+<span class="fc" id="L48">                command.zone(), command.clientId(), buildDescription(command));</span>
+<span class="fc" id="L49">        Ticket saved = ticketWriter.saveWithRetry(ticket);</span>
+<span class="fc" id="L50">        publishTicketCreated(saved);</span>
+        // Adicion 1 (Ampliacion del Modulo G): decide si &quot;saved&quot; se agrupa en una Incidencia
+        // existente o abre una nueva -- ver CorrelationService. Nunca bloquea ni revierte la
+        // creacion del ticket, mismo principio que el publish de Kafka de arriba.
+<span class="fc" id="L54">        correlationService.correlacionar(saved);</span>
+<span class="fc" id="L55">        return saved;</span>
+    }
+
+    private String buildDescription(CreateTicketCommand command) {
+<span class="fc" id="L59">        return command.title() + &quot; -- &quot; + command.description();</span>
+    }
+
+    // Se publica en el mismo hilo, luego de guardar el ticket. Un fallo de Kafka NUNCA
+    // revierte ni bloquea la creacion del ticket (ver EventPublisher/ADR-0004).
+    private void publishTicketCreated(Ticket ticket) {
+<span class="fc" id="L65">        TicketCreatedEvent event = new TicketCreatedEvent(</span>
+<span class="fc" id="L66">                ticket.getId().toString(), ticket.getZone().name(), ticket.getClientId().toString(),</span>
+<span class="fc" id="L67">                ticket.getDescription(), ticket.getCreatedAt().toString());</span>
+<span class="fc" id="L68">        eventPublisher.publish(TOPIC_TICKET_CREATED, event.ticketId(), event);</span>
+<span class="fc" id="L69">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

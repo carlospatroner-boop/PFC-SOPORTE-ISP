@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TelemetryGrpcClientAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.grpc</a> &gt; <span class="el_source">TelemetryGrpcClientAdapter.java</span></div><h1>TelemetryGrpcClientAdapter.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.grpc;
+
+import ec.edu.uteq.soporte.telemetryservice.infrastructure.grpc.EventosResponse;
+import ec.edu.uteq.soporte.telemetryservice.infrastructure.grpc.TelemetryServiceGrpc;
+import ec.edu.uteq.soporte.telemetryservice.infrastructure.grpc.ZonaWindowRequest;
+import ec.edu.uteq.soporte.ticketservice.domain.Zone;
+import ec.edu.uteq.soporte.ticketservice.domain.correlation.TelemetryQueryPort;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
+import jakarta.annotation.PreDestroy;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+/**
+ * Adaptador (implementa el puerto de dominio {@link TelemetryQueryPort}) hacia el gRPC real de
+ * telemetry-service (PE-U1). Las clases generadas ({@code TelemetryServiceGrpc}, etc.) quedan
+ * bajo el paquete &quot;telemetryservice&quot; porque {@code telemetry.proto} fija ese
+ * {@code java_package} -- es el mismo contrato compartido, copiado sin cambios desde
+ * services/telemetry-service/src/main/proto/telemetry.proto, no un error de paquete.
+ */
+@Component
+public class TelemetryGrpcClientAdapter implements TelemetryQueryPort {
+
+<span class="fc" id="L28">    private static final Logger LOGGER = Logger.getLogger(TelemetryGrpcClientAdapter.class.getName());</span>
+
+    private final ManagedChannel channel;
+    private final TelemetryServiceGrpc.TelemetryServiceBlockingStub stub;
+
+    public TelemetryGrpcClientAdapter(
+            @Value(&quot;${telemetry.service.host:localhost}&quot;) String host,
+<span class="fc" id="L35">            @Value(&quot;${telemetry.service.grpc-port:9095}&quot;) int puerto) {</span>
+<span class="fc" id="L36">        this.channel = ManagedChannelBuilder.forAddress(host, puerto).usePlaintext().build();</span>
+<span class="fc" id="L37">        this.stub = TelemetryServiceGrpc.newBlockingStub(channel);</span>
+<span class="fc" id="L38">    }</span>
+
+    @Override
+    public boolean hayEvidenciaDeAveria(Zone zone, long ventanaSegundos) {
+        try {
+<span class="fc" id="L43">            ZonaWindowRequest request = ZonaWindowRequest.newBuilder()</span>
+<span class="fc" id="L44">                    .setZone(zone.name())</span>
+<span class="fc" id="L45">                    .setWindowSeconds(ventanaSegundos)</span>
+<span class="fc" id="L46">                    .build();</span>
+            // El plazo se fija AQUI, en cada llamada -- withDeadlineAfter() calcula un punto
+            // fijo en el tiempo (ahora + 3s) en el momento en que se invoca. Fijarlo una sola
+            // vez en el constructor (bug real que se encontro probando esto en vivo) deja el
+            // plazo vencido para siempre despues de los primeros 3 segundos de vida del bean.
+<span class="fc" id="L51">            EventosResponse response = stub.withDeadlineAfter(3, TimeUnit.SECONDS).getEventosPorZona(request);</span>
+<span class="fc" id="L52">            return response.getEventsList().stream().anyMatch(e -&gt; &quot;EQUIPO&quot;.equals(e.getType()));</span>
+<span class="nc" id="L53">        } catch (StatusRuntimeException e) {</span>
+            // Canal caido o con timeout: se trata como &quot;sin evidencia&quot;, nunca se propaga --
+            // ver TelemetryQueryPort y ADR-0004 (nunca bloquear/revertir la creacion del ticket).
+<span class="nc" id="L56">            LOGGER.log(Level.WARNING, &quot;telemetry-service no respondio, se asume sin evidencia: &quot; + e.getStatus(), e);</span>
+<span class="nc" id="L57">            return false;</span>
+        }
+    }
+
+    @PreDestroy
+    public void cerrarCanal() {
+<span class="fc" id="L63">        channel.shutdownNow();</span>
+<span class="fc" id="L64">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

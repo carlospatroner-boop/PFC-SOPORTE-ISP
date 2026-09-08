@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: >-
+  Si utiliza este repositorio o su informe, por favor cítelo usando los
+  siguientes metadatos.
+type: software
+title: >-
+  Sistema de Gestión de Solicitudes de Soporte Técnico de Internet
+  (Soporte Técnico ISP)
+abstract: >-
+  Proyecto Fin de Curso de la asignatura Aplicaciones Distribuidas (ISR-701),
+  Entrega 4: sistema distribuido de gestión de solicitudes de soporte técnico
+  para un proveedor de servicios de Internet (ISP), con aplicaciones web y
+  móvil, arquitectura de microservicios, persistencia distribuida en
+  CockroachDB, mensajería con Kafka, un pipeline analítico paralelo con
+  Apache Spark, observabilidad con OpenTelemetry/Prometheus/Grafana/Tempo, y
+  una evaluación experimental de calidad contra ISO/IEC 25010.
+authors:
+  - given-names: Carlos José
+    family-names: Carpio Mendoza
+  - given-names: Cristhian Daniel
+    family-names: Pacheco Cárdenas
+  - given-names: Robinson Rodrigo
+    family-names: Cando Moreno
+  - given-names: Jeremy Alexis
+    family-names: Álvarez Párraga
+repository-code: 'https://github.com/carlospatroner-boop/PFC-SOPORTE-ISP'
+license: MIT
+date-released: '2026-09-04'
+keywords:
+  - sistemas distribuidos
+  - microservicios
+  - CockroachDB
+  - Apache Kafka
+  - Apache Spark
+  - observabilidad
+  - ISO/IEC 25010

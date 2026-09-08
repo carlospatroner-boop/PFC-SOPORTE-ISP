@@ -14,9 +14,12 @@ por nivel.
 
 Analisis: media, desviacion tipica e intervalo de confianza al 95%
 (t_bar +/- 1.96*s/sqrt(r)) por nivel; contraste de H1 comparando el mejor nivel
-de paralelismo (N=8) contra el baseline secuencial, emparejado por indice de
-repeticion -- prueba t pareada si Shapiro-Wilk no rechaza normalidad de las
-diferencias (p > 0.05), Wilcoxon signed-rank en caso contrario.
+de paralelismo (N=8) contra el baseline secuencial mediante Mann-Whitney U
+(prueba no parametrica: con solo 8 muestras validas por nivel no puede
+sostenerse el supuesto de normalidad aunque Shapiro-Wilk no lo rechace, por
+eso no se elige el test segun ese resultado) mas el tamano del efecto A de
+Vargha-Delaney. La significancia y la direccion del efecto se reportan por
+separado: un p-valor bajo solo dice que hay diferencia, no en que sentido.
 
 Salidas (en --results-dir):
   raw.csv            -- una fila por repeticion (modo, N, repeticion, tiempo_total_s)
@@ -127,36 +130,53 @@ def analyze(raw_samples: dict, results_dir: Path) -> dict:
             summary[mode] = {"mean": mean, "std": std, "ci_low": lo, "ci_high": hi, "n": len(values)}
             writer.writerow([mode, len(values), round(mean, 3), round(std, 3), round(lo, 3), round(hi, 3)])
 
-    # Contraste de H1: mejor nivel de paralelismo (N=8) vs baseline secuencial,
-    # emparejado por indice de repeticion.
+    # Contraste de H1: mejor nivel de paralelismo (N=8) vs baseline secuencial.
+    # Mann-Whitney U (no parametrica) en vez de t-test/Wilcoxon: con n=8 por grupo
+    # no puede sostenerse el supuesto de normalidad como criterio de seleccion del
+    # test, aunque Shapiro-Wilk no la rechace -- se reporta como diagnostico, no
+    # como criterio de decision.
     parallel = np.array(trimmed_samples[f"N{max(N_VALUES)}"])
     sequential = np.array(trimmed_samples["baseline"])
-    n_pairs = min(len(parallel), len(sequential))
-    parallel, sequential = parallel[:n_pairs], sequential[:n_pairs]
-    differences = sequential - parallel
+    differences = sequential[: len(parallel)] - parallel[: len(sequential)]
 
     shapiro_stat, shapiro_p = stats.shapiro(differences)
     normal = bool(shapiro_p > 0.05)
 
-    if normal:
-        test_name = "prueba t pareada (t-test relacionado)"
-        stat, p_value = stats.ttest_rel(sequential, parallel)
-    else:
-        test_name = "Wilcoxon signed-rank"
-        stat, p_value = stats.wilcoxon(sequential, parallel)
+    test_name = "Mann-Whitney U (bilateral)"
+    stat, p_value = stats.mannwhitneyu(sequential, parallel, alternative="two-sided")
 
-    # bool(...) explicito: numpy.bool_ (resultado de comparar escalares numpy) no es
-    # serializable por json.dump, que solo reconoce el tipo bool nativo de Python.
-    reject_h0 = bool(p_value < 0.05 and differences.mean() > 0)
+    # Tamano del efecto A de Vargha-Delaney: probabilidad de que una corrida del
+    # baseline tome mas tiempo que una corrida de N=8, tomadas al azar. A > 0.5
+    # favorece al baseline (mas lento), A < 0.5 favorece a N=8 (mas lento).
+    # U_mayor = veces que "sequential" > "parallel" (mas empates a 0.5 cada uno).
+    n_seq, n_par = len(sequential), len(parallel)
+    u_seq, _ = stats.mannwhitneyu(sequential, parallel, alternative="greater")
+    vargha_delaney_a = float(u_seq) / (n_seq * n_par)
+
+    is_significant = bool(p_value < 0.05)
+    baseline_slower = bool(differences.mean() > 0)  # sequential - parallel > 0
+    if is_significant and baseline_slower:
+        conclusion = ("H0 se rechaza: el baseline secuencial fue significativamente mas lento "
+                      "que Spark local[8] -- soporta H1 tal como fue formulada.")
+    elif is_significant and not baseline_slower:
+        conclusion = ("H0 se rechaza (diferencia altamente significativa), pero en direccion "
+                      "opuesta a la hipotizada en H1: el baseline secuencial fue mas rapido que "
+                      "Spark local[8], no al reves. H1 no se sostiene.")
+    else:
+        conclusion = "No se rechaza H0: no hay diferencia estadisticamente significativa al 95%."
+
     stats_result = {
         "hipotesis": "H1: el pipeline paralelo (N=8) tiene menor tiempo medio que el baseline secuencial",
-        "shapiro_wilk": {"estadistico": float(shapiro_stat), "p_valor": float(shapiro_p), "normal": normal},
+        "shapiro_wilk_diagnostico": {
+            "estadistico": float(shapiro_stat), "p_valor": float(shapiro_p), "normal": normal,
+            "nota": "diagnostico informativo; no se usa para elegir el test dado n=8 por grupo",
+        },
         "prueba_usada": test_name,
-        "estadistico": float(stat),
+        "estadistico_u": float(stat),
         "p_valor": float(p_value),
+        "tamano_efecto_vargha_delaney_a": round(vargha_delaney_a, 4),
         "diferencia_media_s": float(differences.mean()),
-        "conclusion": "se rechaza H0: el pipeline paralelo es significativamente mas rapido" if reject_h0
-                      else "no se rechaza H0 (sin diferencia significativa al 95%)",
+        "conclusion": conclusion,
     }
     with open(results_dir / "stats_test.json", "w") as f:
         json.dump(stats_result, f, indent=2, ensure_ascii=False)

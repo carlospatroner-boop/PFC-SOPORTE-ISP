@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthGatewayFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.security</a> &gt; <span class="el_source">AuthGatewayFilter.java</span></div><h1>AuthGatewayFilter.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.security;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import ec.edu.uteq.soporte.ticketservice.domain.Zone;
+import ec.edu.uteq.soporte.ticketservice.presentation.dto.ApiResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+/**
+ * Exige un access token valido (emitido por auth-service) en cada llamada a
+ * /api/v1/tickets/**. En vez de verificar la firma del JWT aqui mismo, delega la
+ * validacion a auth-service llamando a su endpoint GET /validate -- asi el secreto
+ * de firma nunca sale de auth-service y la logica de validacion vive en un solo
+ * lugar. Trade-off aceptado: ticket-service ahora depende en tiempo real de que
+ * auth-service este arriba.
+ *
+ * Vive en infrastructure/security porque es un detalle de transporte HTTP (un
+ * Servlet Filter), no logica de dominio ni de aplicacion.
+ */
+@Component
+public class AuthGatewayFilter extends OncePerRequestFilter {
+
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
+    private final String validateUrl;
+
+    public AuthGatewayFilter(ObjectMapper objectMapper,
+<span class="nc" id="L40">                              @Value(&quot;${auth.service.base-url}&quot;) String authServiceBaseUrl) {</span>
+<span class="nc" id="L41">        this.objectMapper = objectMapper;</span>
+<span class="nc" id="L42">        this.restClient = RestClient.create();</span>
+<span class="nc" id="L43">        this.validateUrl = authServiceBaseUrl + &quot;/validate&quot;;</span>
+<span class="nc" id="L44">    }</span>
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        return &quot;OPTIONS&quot;.equalsIgnoreCase(request.getMethod())</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">                || !request.getRequestURI().startsWith(&quot;/api/v1/tickets&quot;);</span>
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+<span class="nc" id="L55">        String header = request.getHeader(&quot;Authorization&quot;);</span>
+<span class="nc bnc" id="L56" title="All 4 branches missed.">        if (header == null || !header.startsWith(&quot;Bearer &quot;)) {</span>
+<span class="nc" id="L57">            writeUnauthorized(response, &quot;Se requiere iniciar sesion (encabezado Authorization ausente)&quot;);</span>
+<span class="nc" id="L58">            return;</span>
+        }
+
+        try {
+<span class="nc" id="L62">            ApiResponse&lt;ValidateResponse&gt; validated = restClient.get()</span>
+<span class="nc" id="L63">                    .uri(validateUrl)</span>
+<span class="nc" id="L64">                    .header(&quot;Authorization&quot;, header)</span>
+<span class="nc" id="L65">                    .retrieve()</span>
+<span class="nc" id="L66">                    .body(new ParameterizedTypeReference&lt;ApiResponse&lt;ValidateResponse&gt;&gt;() {</span>
+                    });
+
+<span class="nc bnc" id="L69" title="All 4 branches missed.">            if (validated == null || validated.data() == null) {</span>
+<span class="nc" id="L70">                writeUnauthorized(response, &quot;Token invalido&quot;);</span>
+<span class="nc" id="L71">                return;</span>
+            }
+
+<span class="nc" id="L74">            request.setAttribute(&quot;authUserId&quot;, UUID.fromString(validated.data().userId()));</span>
+<span class="nc" id="L75">            request.setAttribute(&quot;authRole&quot;, validated.data().role());</span>
+<span class="nc" id="L76">            request.setAttribute(&quot;authZone&quot;, parseZone(validated.data().zone()));</span>
+<span class="nc" id="L77">            filterChain.doFilter(request, response);</span>
+<span class="nc" id="L78">        } catch (RestClientException e) {</span>
+<span class="nc" id="L79">            writeUnauthorized(response, &quot;Token invalido o auth-service no disponible: &quot; + e.getMessage());</span>
+<span class="nc" id="L80">        }</span>
+<span class="nc" id="L81">    }</span>
+
+    // Valor invalido/desconocido se trata como &quot;sin zona&quot; (fail-closed): un TECNICO
+    // sin zona reconocible no obtiene acceso amplio, ver TicketService.
+    private Zone parseZone(String zoneClaim) {
+<span class="nc bnc" id="L86" title="All 4 branches missed.">        if (zoneClaim == null || zoneClaim.isBlank()) {</span>
+<span class="nc" id="L87">            return null;</span>
+        }
+        try {
+<span class="nc" id="L90">            return Zone.valueOf(zoneClaim);</span>
+<span class="nc" id="L91">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L92">            return null;</span>
+        }
+    }
+
+    private void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
+<span class="nc" id="L97">        response.setStatus(HttpStatus.UNAUTHORIZED.value());</span>
+<span class="nc" id="L98">        response.setContentType(&quot;application/json&quot;);</span>
+<span class="nc" id="L99">        objectMapper.writeValue(response.getWriter(), ApiResponse.of(null, message));</span>
+<span class="nc" id="L100">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

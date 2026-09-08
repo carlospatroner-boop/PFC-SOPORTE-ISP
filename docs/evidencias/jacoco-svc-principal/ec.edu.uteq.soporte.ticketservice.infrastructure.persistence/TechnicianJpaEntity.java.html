@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TechnicianJpaEntity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.persistence</a> &gt; <span class="el_source">TechnicianJpaEntity.java</span></div><h1>TechnicianJpaEntity.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.persistence;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.util.UUID;
+
+/**
+ * Copia local minima de un tecnico, sincronizada por evento desde auth-service (ver
+ * infrastructure/messaging/TechnicianSyncListener.java) -- ticket-service no es dueno de
+ * esta identidad, solo necesita que la fila exista para satisfacer
+ * tickets_technician_id_fkey (ver db-cluster/scripts/init_db.sql) al asignar un tecnico a
+ * un ticket. No expone puerto de dominio ni repositorio publico porque, a diferencia de
+ * Ticket, ningun caso de uso de este servicio consulta ni lista tecnicos por si mismo.
+ */
+@Entity
+@Table(name = &quot;technicians&quot;)
+public class TechnicianJpaEntity {
+
+    @Id
+    private UUID id;
+
+    @Column(name = &quot;full_name&quot;, nullable = false)
+    private String fullName;
+
+    @Column(nullable = false)
+    private String zone;
+
+    private String specialty;
+
+    @Column(nullable = false)
+    private boolean active;
+
+<span class="nc" id="L36">    protected TechnicianJpaEntity() {</span>
+        // Requerido por JPA.
+<span class="nc" id="L38">    }</span>
+
+<span class="fc" id="L40">    public TechnicianJpaEntity(UUID id, String fullName, String zone, String specialty, boolean active) {</span>
+<span class="fc" id="L41">        this.id = id;</span>
+<span class="fc" id="L42">        this.fullName = fullName;</span>
+<span class="fc" id="L43">        this.zone = zone;</span>
+<span class="fc" id="L44">        this.specialty = specialty;</span>
+<span class="fc" id="L45">        this.active = active;</span>
+<span class="fc" id="L46">    }</span>
+
+    public UUID getId() {
+<span class="fc" id="L49">        return id;</span>
+    }
+
+    public String getFullName() {
+<span class="fc" id="L53">        return fullName;</span>
+    }
+
+    public void setFullName(String fullName) {
+<span class="fc" id="L57">        this.fullName = fullName;</span>
+<span class="fc" id="L58">    }</span>
+
+    public String getZone() {
+<span class="fc" id="L61">        return zone;</span>
+    }
+
+    public void setZone(String zone) {
+<span class="fc" id="L65">        this.zone = zone;</span>
+<span class="fc" id="L66">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

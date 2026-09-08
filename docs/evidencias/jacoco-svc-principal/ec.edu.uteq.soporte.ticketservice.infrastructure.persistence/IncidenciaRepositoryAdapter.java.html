@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IncidenciaRepositoryAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.persistence</a> &gt; <span class="el_source">IncidenciaRepositoryAdapter.java</span></div><h1>IncidenciaRepositoryAdapter.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.persistence;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Incidencia;
+import ec.edu.uteq.soporte.ticketservice.domain.IncidenciaRepository;
+import ec.edu.uteq.soporte.ticketservice.domain.Zone;
+import org.springframework.stereotype.Repository;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Adaptador (patron Repository) que implementa el puerto de dominio IncidenciaRepository
+ * delegando en Spring Data JPA -- mismo criterio exacto que TicketRepositoryAdapter.
+ */
+@Repository
+public class IncidenciaRepositoryAdapter implements IncidenciaRepository {
+
+    private final SpringDataIncidenciaRepository jpaRepository;
+    private final IncidenciaMapper mapper;
+
+<span class="fc" id="L22">    public IncidenciaRepositoryAdapter(SpringDataIncidenciaRepository jpaRepository, IncidenciaMapper mapper) {</span>
+<span class="fc" id="L23">        this.jpaRepository = jpaRepository;</span>
+<span class="fc" id="L24">        this.mapper = mapper;</span>
+<span class="fc" id="L25">    }</span>
+
+    @Override
+    public List&lt;Incidencia&gt; findByZoneAndCreatedAtAfter(Zone zone, OffsetDateTime desde) {
+<span class="fc" id="L29">        return jpaRepository.findByZoneAndCreatedAtAfter(zone, desde).stream().map(mapper::toDomain).toList();</span>
+    }
+
+    @Override
+    public List&lt;Incidencia&gt; findByZone(Zone zone) {
+<span class="nc" id="L34">        return jpaRepository.findByZone(zone).stream().map(mapper::toDomain).toList();</span>
+    }
+
+    @Override
+    public List&lt;Incidencia&gt; findAll() {
+<span class="fc" id="L39">        return jpaRepository.findAll().stream().map(mapper::toDomain).toList();</span>
+    }
+
+    @Override
+    public Incidencia save(Incidencia incidencia) {
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (incidencia.getId() == null) {</span>
+<span class="fc" id="L45">            incidencia.setId(UUID.randomUUID());</span>
+        }
+<span class="fc" id="L47">        IncidenciaJpaEntity saved = jpaRepository.save(mapper.toEntity(incidencia));</span>
+<span class="fc" id="L48">        return mapper.toDomain(saved);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

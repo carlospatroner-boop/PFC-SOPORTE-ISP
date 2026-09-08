@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrdbMetrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.metrics</a> &gt; <span class="el_source">CrdbMetrics.java</span></div><h1>CrdbMetrics.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.metrics;
+
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import org.springframework.stereotype.Component;
+
+import javax.sql.DataSource;
+import java.time.Duration;
+
+/**
+ * Los 3 instrumentos Prometheus incrementales exigidos por la Guia de Entrega 3
+ * (D3.2, Modulo G): validables con `promtool check metrics` sobre la salida cruda
+ * de /actuator/prometheus.
+ *
+ * &lt;pre&gt;
+ * crdb_query_duration_seconds     histogram  duracion de cada consulta al puerto TicketRepository
+ * crdb_transaction_retries_total  counter    reintentos por conflicto de escritura serializable
+ * crdb_pool_active_connections    gauge      conexiones activas del pool HikariCP hacia CockroachDB
+ * &lt;/pre&gt;
+ *
+ * El histograma y el contador se usan desde otras clases (ver
+ * RepositoryTimingAspect y application/command/CreateTicketHandler#saveWithRetry); el gauge se
+ * auto-actualiza porque Micrometer lo re-consulta bajo demanda contra el HikariPoolMXBean real,
+ * no contra un valor cacheado.
+ */
+@Component
+public class CrdbMetrics {
+
+    private final Counter transactionRetries;
+    private final Timer queryDuration;
+
+<span class="fc" id="L36">    public CrdbMetrics(MeterRegistry registry, DataSource dataSource) {</span>
+<span class="fc" id="L37">        this.transactionRetries = Counter.builder(&quot;crdb_transaction_retries_total&quot;)</span>
+<span class="fc" id="L38">                .description(&quot;Reintentos de transaccion por conflicto de escritura serializable en CockroachDB&quot;)</span>
+<span class="fc" id="L39">                .register(registry);</span>
+
+<span class="fc" id="L41">        this.queryDuration = Timer.builder(&quot;crdb_query_duration_seconds&quot;)</span>
+<span class="fc" id="L42">                .description(&quot;Duracion de cada consulta ejecutada contra el cluster CockroachDB&quot;)</span>
+<span class="fc" id="L43">                .publishPercentileHistogram()</span>
+<span class="fc" id="L44">                .minimumExpectedValue(Duration.ofMillis(5))</span>
+<span class="fc" id="L45">                .maximumExpectedValue(Duration.ofSeconds(2))</span>
+<span class="fc" id="L46">                .register(registry);</span>
+
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (dataSource instanceof HikariDataSource hikari) {</span>
+<span class="fc" id="L49">            Gauge.builder(&quot;crdb_pool_active_connections&quot;, hikari, CrdbMetrics::activeConnections)</span>
+<span class="fc" id="L50">                    .description(&quot;Conexiones activas del pool HikariCP hacia CockroachDB&quot;)</span>
+<span class="fc" id="L51">                    .register(registry);</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    private static double activeConnections(HikariDataSource hikari) {
+<span class="fc" id="L56">        HikariPoolMXBean pool = hikari.getHikariPoolMXBean();</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        return pool != null ? pool.getActiveConnections() : 0;</span>
+    }
+
+    public Timer queryDurationTimer() {
+<span class="fc" id="L61">        return queryDuration;</span>
+    }
+
+    public void incrementTransactionRetries() {
+<span class="fc" id="L65">        transactionRetries.increment();</span>
+<span class="fc" id="L66">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

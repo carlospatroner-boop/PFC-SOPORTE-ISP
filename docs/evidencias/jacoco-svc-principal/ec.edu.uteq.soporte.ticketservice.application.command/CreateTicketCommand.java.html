@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateTicketCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.application.command</a> &gt; <span class="el_source">CreateTicketCommand.java</span></div><h1>CreateTicketCommand.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.application.command;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Zone;
+
+import java.util.UUID;
+
+/**
+ * &quot;zone&quot; todavia se recibe explicitamente; idealmente deberia inferirse de la direccion del
+ * cliente, pero eso queda fuera de alcance (limitacion conocida, documentada en el informe
+ * LaTeX). &quot;clientId&quot;/&quot;role&quot; ya vienen resueltos del token validado por auth-service, nunca
+ * de un valor que el cliente pueda falsificar (ver TicketController).
+ */
+<span class="fc" id="L13">public record CreateTicketCommand(</span>
+        Zone zone,
+        String title,
+        String description,
+        String contactPhone,
+        String address,
+        UUID clientId,
+        String role
+) {
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

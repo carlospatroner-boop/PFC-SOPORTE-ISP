@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TechnicianSyncListener.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.infrastructure.messaging</a> &gt; <span class="el_source">TechnicianSyncListener.java</span></div><h1>TechnicianSyncListener.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.infrastructure.messaging;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import ec.edu.uteq.soporte.ticketservice.domain.event.TechnicianCreatedEvent;
+import ec.edu.uteq.soporte.ticketservice.infrastructure.persistence.SpringDataTechnicianRepository;
+import ec.edu.uteq.soporte.ticketservice.infrastructure.persistence.TechnicianJpaEntity;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+
+import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Otro lado de la Saga por coreografia (ver TechnicianEventPublisher en auth-service):
+ * consume &quot;technician.created&quot; y sincroniza la tabla local `technicians`. Antes de esto, un
+ * TECNICO dado de alta desde el panel de Admin de la web nunca llegaba aqui, y
+ * AssignTechnicianHandler fallaba con una violacion de tickets_technician_id_fkey al
+ * intentar asignarlo -- bug real, no hipotetico, encontrado probando la consola con una
+ * cuenta de tecnico recien creada.
+ *
+ * Idempotente por diseno: si el mismo evento se reprocesa (redelivery de Kafka), el upsert
+ * por id simplemente vuelve a escribir los mismos datos, no duplica filas.
+ */
+@Component
+public class TechnicianSyncListener {
+
+<span class="fc" id="L28">    private static final Logger LOGGER = Logger.getLogger(TechnicianSyncListener.class.getName());</span>
+
+    private final SpringDataTechnicianRepository technicianRepository;
+    private final ObjectMapper objectMapper;
+
+<span class="fc" id="L33">    public TechnicianSyncListener(SpringDataTechnicianRepository technicianRepository, ObjectMapper objectMapper) {</span>
+<span class="fc" id="L34">        this.technicianRepository = technicianRepository;</span>
+<span class="fc" id="L35">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L36">    }</span>
+
+    @KafkaListener(topics = &quot;technician.created&quot;, groupId = &quot;ticket-service&quot;)
+    public void onTechnicianCreated(String payload) {
+        try {
+<span class="fc" id="L41">            TechnicianCreatedEvent event = objectMapper.readValue(payload, TechnicianCreatedEvent.class);</span>
+<span class="fc" id="L42">            upsert(event);</span>
+<span class="fc" id="L43">        } catch (Exception e) {</span>
+<span class="fc" id="L44">            LOGGER.log(Level.WARNING, &quot;No se pudo procesar un mensaje de technician.created: &quot; + payload, e);</span>
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">    }</span>
+
+    private void upsert(TechnicianCreatedEvent event) {
+<span class="fc" id="L49">        UUID id = UUID.fromString(event.technicianId());</span>
+<span class="fc" id="L50">        TechnicianJpaEntity technician = technicianRepository.findById(id)</span>
+<span class="fc" id="L51">                .orElse(new TechnicianJpaEntity(id, event.fullName(), event.zone(), null, true));</span>
+<span class="fc" id="L52">        technician.setFullName(event.fullName());</span>
+<span class="fc" id="L53">        technician.setZone(event.zone());</span>
+<span class="fc" id="L54">        technicianRepository.save(technician);</span>
+<span class="fc" id="L55">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

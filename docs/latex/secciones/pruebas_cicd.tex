@@ -143,7 +143,10 @@ mano) — se excluye explícitamente en el \texttt{pom.xml} (perfil \texttt{cove
 comentario que documenta por qué. Sin esa exclusión, ese código generado por sí solo diluía la
 cifra reportada de 59.3\,\% (antes de que \texttt{telemetry-service}/\texttt{CORREL} existieran)
 a un engañoso 42.7\,\%, contando en contra código que nadie prueba por convención en ningún
-proyecto Java real.
+proyecto Java real. El reporte HTML de JaCoCo que respalda esta cifra —no solo una tabla escrita
+a mano— está publicado en \texttt{docs/evidencias/jacoco-svc-principal/}, junto con el archivo
+binario crudo (\texttt{jacoco.exec}) para quien quiera regenerarlo o verificarlo con otra
+herramienta.
 
 Antes de escribir pruebas nuevas para esta entrega, el código propio (sin el generado) ya estaba
 en 64.4\,\%. Se identificaron con el propio reporte de JaCoCo las clases reales con mayor número

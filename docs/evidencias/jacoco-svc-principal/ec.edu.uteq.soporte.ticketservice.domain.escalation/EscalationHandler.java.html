@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EscalationHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">ticket-service</a> &gt; <a href="index.source.html" class="el_package">ec.edu.uteq.soporte.ticketservice.domain.escalation</a> &gt; <span class="el_source">EscalationHandler.java</span></div><h1>EscalationHandler.java</h1><pre class="source lang-java linenums">package ec.edu.uteq.soporte.ticketservice.domain.escalation;
+
+import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
+
+import java.util.Optional;
+
+/**
+ * Patron Chain of Responsibility: cada eslabon decide si un ticket debe escalarse por su
+ * propio criterio; si no aplica, delega al siguiente eslabon de la cadena. Ningun eslabon
+ * conoce a los demas mas que a traves de &quot;next&quot; -- se pueden agregar, quitar o reordenar
+ * criterios de escalado sin tocar los eslabones existentes.
+ *
+ * Esta cadena es funcionalidad nueva: en E3 el estado ESCALADO existia en el enum
+ * TicketStatus pero ningun camino del codigo lo alcanzaba automaticamente.
+ */
+<span class="fc" id="L16">public abstract class EscalationHandler {</span>
+
+    private EscalationHandler next;
+
+    public EscalationHandler linkWith(EscalationHandler next) {
+<span class="fc" id="L21">        this.next = next;</span>
+<span class="fc" id="L22">        return next;</span>
+    }
+
+    public final Optional&lt;String&gt; handle(Ticket ticket) {
+<span class="fc" id="L26">        Optional&lt;String&gt; reason = evaluate(ticket);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (reason.isPresent()) {</span>
+<span class="fc" id="L28">            return reason;</span>
+        }
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        return next != null ? next.handle(ticket) : Optional.empty();</span>
+    }
+
+    /** @return el motivo de escalado si este eslabon decide escalar, vacio si no le compete. */
+    protected abstract Optional&lt;String&gt; evaluate(Ticket ticket);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

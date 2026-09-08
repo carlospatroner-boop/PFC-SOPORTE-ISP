@@ -75,6 +75,7 @@ comportamiento que se contrasta con la medición empírica de la
 Sección~\ref{sec:cluster-verificacion}.
 
 \subsection{Modelo de programación paralela}
+\label{sec:fundamento-modelo-paralelo}
 
 El modelo RDD (\emph{Resilient Distributed Dataset}) de Apache Spark~\cite{zaharia2012rdd} abstrae
 una colección distribuida \textbf{inmutable}, con \textbf{linaje} (\emph{lineage}) de
@@ -190,3 +191,55 @@ característica y a reportar la desviación respecto a ese umbral cuando ocurre,
 valoración subjetiva de si el sistema ``es de buena calidad''. La Sección~\ref{sec:iso25010}
 aplica cinco de las ocho características a este proyecto, siguiendo esa misma disciplina de
 declarar el umbral antes de medir.
+
+\subsection{Trazabilidad de temas a artefacto}
+\label{sec:trazabilidad-temas}
+
+La Tabla~\ref{tab:trazabilidad-temas} hace explícito, para cada tema de la asignatura cubierto en
+este documento, el artefacto real del repositorio donde se implementa —no solo el lugar donde se
+menciona en el texto.
+
+\begin{table}[H]
+\centering
+\caption{Trazabilidad de temas de la asignatura a su artefacto en el repositorio}
+\label{tab:trazabilidad-temas}
+\small
+\begin{tabular}{@{}p{3.1cm}p{9.4cm}@{}}
+\toprule
+\textbf{Tema} & \textbf{Artefacto} \\
+\midrule
+gRPC &
+  \texttt{services/telemetry-service/src/main/proto/telemetry.proto} y
+  \texttt{TelemetryGrpcService.java} (servidor); cliente real en
+  \texttt{ZonaVentanaTelemetriaStrategy} de \texttt{svc-principal} \\
+Saga por coreografía sobre Kafka &
+  \texttt{CreateTicketHandler} publica \texttt{TicketCreated}; \texttt{notification-service} y
+  \texttt{report-service} (\texttt{ReportEventListener}) reaccionan de forma autónoma, sin
+  orquestador central; \texttt{TechnicianEventPublisher} en \texttt{auth-service} sigue el mismo
+  patrón para \texttt{TechnicianCreatedEvent} \\
+CQRS &
+  Separación por servicio: \texttt{svc-principal/application/command/} concentra la escritura
+  (\texttt{CreateTicketHandler}, \texttt{AssignTechnicianHandler},
+  \texttt{UpdateTicketStatusHandler}); \texttt{report-service/application/ReportQueryService.java}
+  concentra la lectura, sobre una proyección propia (\texttt{TicketSummary}) \\
+Fragmentación en CockroachDB &
+  \texttt{db-cluster/scripts/init\_*.sql} (esquema particionado real); decisión documentada en
+  \texttt{docs/adr/0003-sharding-policy.md} \\
+Spark y ley de Amdahl &
+  \texttt{spark/} (pipeline paralelo real); análisis en
+  Sección~\ref{sec:pipeline-paralelo} y en la Subsección~\ref{sec:fundamento-modelo-paralelo} de
+  este mismo documento \\
+Patrón Observer &
+  \texttt{EscalationLoggingObserver}, \texttt{EscalationMetricsObserver} y
+  \texttt{EscalationEventPublisherObserver} en \texttt{svc-principal}; decisión documentada en
+  \texttt{docs/adr/0005-patrones-gof.md} \\
+Arquitectura hexagonal (4 capas) &
+  \texttt{domain/}, \texttt{application/}, \texttt{infrastructure/} y \texttt{presentation/} en
+  \texttt{auth-service}, \texttt{report-service} y \texttt{svc-principal}; alcance real declarado
+  en la Sección~\ref{sec:arquitectura-e4} \\
+Observabilidad (Prometheus, Grafana, Tempo, OpenTelemetry) &
+  \texttt{ops/prometheus/}, \texttt{ops/grafana/}, \texttt{ops/tempo/} y
+  \texttt{ops/otel-collector/}; desarrollado en la Sección~\ref{sec:observabilidad} \\
+\bottomrule
+\end{tabular}
+\end{table}

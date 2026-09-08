@@ -1,0 +1,86 @@
+\section{Resultado del experimento CORREL}
+\label{sec:resultado-correl}
+
+Esta sección responde la pregunta que da sentido a la Adición 1 de la Ampliación del Módulo G
+(Sección~\ref{sec:pe-u1-correl}, \texttt{docs/adr/0008-correl-incidencias.md}): ¿agrupar tickets
+por zona, ventana deslizante y telemetría (\texttt{c1}/\texttt{c2}) mejora realmente el
+agrupamiento de una avería frente a no correlacionar (\texttt{c0}), y a qué costo en falsos
+positivos? El procedimiento completo, el entorno congelado y los datos crudos están en
+\texttt{experimentos/protocolo-e4.md} y \texttt{experimentos/resultados/}; esta sección resume
+el análisis.
+
+\subsection{Escala ejecutada}
+
+Por restricción de tiempo se ejecutó una escala reducida frente al protocolo completo de la
+Sección~5.4 de la guía de reutilización (10 repeticiones, 100--500 abonados por escenario):
+\textbf{5 repeticiones} por condición, con \textbf{20 abonados} (Esc-2, avería masiva),
+\textbf{60 abonados} (Esc-3, avería mayor) y \textbf{20+20 abonados en dos zonas} (Esc-4, dos
+averías simultáneas), bajo las tres configuraciones \texttt{c0}/\texttt{c1}/\texttt{c2} sin
+reducir. Esto da 45 corridas reales (60 filas de resultado, ya que Esc-4 reporta una fila por
+zona) contra el stack completo levantado con \texttt{docker compose up -d --build}, no
+simuladas. El Esc-1 (carga nominal sin avería) no se repite aquí: es el mismo escenario A de
+\texttt{resultados/locust/} ya usado para la Tabla~\ref{tab:iso-umbrales}. Entre
+cada corrida se vació el estado de correlación (\texttt{TRUNCATE incidencias,
+incidencia\_tickets}) para eliminar contaminación entre repeticiones, ya que el servicio busca
+candidatas por zona y ventana de 15 minutos sin distinguir de qué corrida provienen.
+
+\subsection{Resultado por configuración}
+
+\begin{table}[H]
+\centering
+\caption{Precisión y exhaustividad del agrupamiento por configuración CORREL (n=20 por
+configuración; mediana igual a la media en las 3 configuraciones por la separación completa
+observada)}
+\label{tab:resultado-correl}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Configuración} & \textbf{Precisión} & \textbf{Exhaustividad} & \textbf{Incidencias efectivas (media)} \\
+\midrule
+\texttt{c0} (sin correlación)     & 1.00 & 0.04 & 30.0 \\
+\texttt{c1} (zona+ventana)        & 1.00 & 1.00 & 1.0  \\
+\texttt{c2} (zona+ventana+telemetría) & 1.00 & 1.00 & 1.0  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La precisión es 1.00 en las tres configuraciones porque, dado el diseño de una sola avería por
+zona y ventana, ningún ticket ajeno a la avería inyectada entra jamás a la incidencia que se
+compara —no hay falsos positivos que penalicen la precisión con este diseño de escenario—. La
+diferencia real está en la exhaustividad: \texttt{c0} abre una incidencia por ticket (línea
+base, exhaustividad $\approx 1/N$ por diseño: cada ticket es su propia incidencia), mientras que
+\texttt{c1} y \texttt{c2} agrupan el 100\,\% de los tickets de la avería en una sola incidencia,
+reduciendo la carga real de trabajo del despachador de $N$ incidencias a 1 por avería.
+
+\subsection{Contraste estadístico}
+
+Con Mann--Whitney U (bilateral) sobre la exhaustividad de \texttt{c2} contra \texttt{c0}
+(n=20 por grupo): $U=400$, $p \approx 2.58 \times 10^{-9}$, con tamaño del efecto de
+Vargha--Delaney $\hat{A}_{12}=1.0$ —separación completa: en las 20 corridas de \texttt{c2}, la
+exhaustividad observada superó a las 20 de \texttt{c0} sin una sola excepción—. \textbf{Se
+rechaza H0}: la diferencia entre correlacionar y no correlacionar es estadísticamente
+significativa y de magnitud máxima bajo esta métrica y esta escala.
+
+\subsection{Control negativo y Escenario 4}
+
+El control negativo se cumple: bajo \texttt{c0}, Esc-3 (60 abonados) abrió en promedio 60
+incidencias —una por ticket, el comportamiento esperado de la línea base—, confirmando que la
+carga sí reprodujo el fenómeno y que la comparación posterior tiene sentido.
+
+En las 30 corridas de Esc-4 (dos averías simultáneas, en \emph{zonas distintas}, bajo las 3
+configuraciones) no se observó ninguna fusión errónea entre las dos averías (intervalo de
+confianza binomial al 95\,\%: $[0,\,0]$). Esto es el resultado esperado dado que la correlación
+filtra candidatas por zona antes de aplicar la estrategia
+(\texttt{IncidenciaRepository.findByZoneAndCreatedAtAfter}): una fusión cruzada de zona es
+estructuralmente imposible en esta implementación, así que Esc-4 tal como está especificado en
+la guía (zonas distintas) valida el particionado por zona en vez de estresar el caso de fusión
+más interesante —dos averías simultáneas \emph{dentro de la misma zona}—, que queda como
+extensión natural del protocolo completo.
+
+\subsection{Qué falta para el protocolo completo}
+
+Esta corrida demuestra que el mecanismo mide algo real y reproducible, no solo que compila. Para
+el protocolo completo de la Sección~5.4 de la guía falta: subir a 10 repeticiones por condición,
+subir la escala de abonados a la especificada (100/500/100+100), y —de forma explícita, no
+contemplada por el escenario oficial— correr una variante de Esc-4 con dos averías en la
+\emph{misma} zona, que es el caso donde una fusión errónea sí sería estructuralmente posible y
+donde el escenario cumpliría su propósito declarado de revelar ese riesgo.

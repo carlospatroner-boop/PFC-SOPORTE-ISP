@@ -53,9 +53,9 @@ un grupo de contenedores transversal. La Figura~\ref{fig:c4-nivel2} muestra el d
 \texttt{auth-service} & Java 21 + Spring Boot & JWT, RBAC, refresh tokens \\
 \texttt{ticket-service} & Java 21 + Spring Boot & CRUD de tickets, arquitectura hexagonal (Sección~\ref{sec:hexagonal-e4}) \\
 \texttt{ai-service} & Python + FastAPI & Clasificación asíncrona por reglas \\
-\texttt{notification-service} & Node.js + Express & Notificaciones multicanal simuladas \\
+\texttt{\seqsplit{notification-service}} & Node.js + Express & Notificaciones multicanal simuladas \\
 \texttt{report-service} & Java 21 + Spring Boot & Modelo de lectura CQRS, reportes \\
-\texttt{telemetry-service} & Java 21, sockets TCP + gRPC & Canal PE-U1: equipos del abonado + latidos de nodo, reloj de Lamport (Sección~\ref{sec:pe-u1-correl}) \\
+\texttt{\seqsplit{telemetry-service}} & Java 21, sockets TCP + gRPC & Canal PE-U1: equipos del abonado + latidos de nodo, reloj de Lamport (Sección~\ref{sec:pe-u1-correl}) \\
 CockroachDB & Cluster 3 nodos & Persistencia distribuida (auth\_db/ticket\_db/report\_db) \\
 Kafka + MongoDB & --- & Saga por coreografía, clasificaciones y notificaciones \\
 OTel Collector, Tempo, Prometheus, Grafana, cAdvisor & --- & Observabilidad (Sección~\ref{sec:observabilidad}) \\
@@ -116,8 +116,8 @@ caso.}
 \texttt{report-service} & 4 capas & \texttt{ReportController} llamaba a
   \texttt{TicketSummaryRepository} (JPA) y filtraba en memoria directamente en la capa de
   presentación, sin capa de aplicación \\
-\texttt{ai-service}, \texttt{notification-service}, \texttt{api-gateway} & Sin cambios &
-  Fuera de alcance en esta entrega (declarado explícitamente, no un olvido) \\
+\texttt{ai-service}, \texttt{\seqsplit{notification-service}}, \texttt{api-gateway} & Sin cambios &
+Fuera de alcance en esta entrega (declarado explícitamente, no un olvido) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -141,7 +141,7 @@ Responsibility, Observer, Repository, Strategy)—, cada uno documentado en deta
 antes del refactor:
 
 \begin{enumerate}[nosep]
-  \item \textbf{Repository} --- desacopla el dominio de \texttt{JpaRepository} (Spring Data) vía
+  \item \textbf{Repository} --- desacopla el dominio de \texttt{\seqsplit{JpaRepository}} (Spring Data) vía
         un puerto (\texttt{TicketRepository}, en el paquete \texttt{domain}) implementado por un
         adaptador de infraestructura.
   \item \textbf{Factory Method} --- centraliza la creación de un \texttt{Ticket} nuevo
@@ -152,7 +152,7 @@ antes del refactor:
         objeto inmutable ejecutado por un \emph{handler} dedicado, desacoplando al controlador de
         cómo se ejecuta la acción.
   \item \textbf{Chain of Responsibility} --- dos eslabones de evaluación de escalado
-        (\texttt{SlaBreachedEscalationHandler}, \texttt{StaleCriticalEscalationHandler}) que
+      (\texttt{\seqsplit{SlaBreachedEscalationHandler}}, \texttt{\seqsplit{StaleCriticalEscalationHandler}}) que
         implementan una funcionalidad que antes no existía en absoluto: el estado
         \texttt{ESCALADO} era inalcanzable desde la Entrega 3.
   \item \textbf{Observer} --- tres observadores del evento de escalado (\emph{logging}, métrica de

@@ -33,7 +33,7 @@ evitar una explosión de cardinalidad de series temporales distintas por cada ti
 \subsection{Registros estructurados}
 
 Los cuatro servicios Java emiten registros en JSON estructurado con Logback
-(\texttt{LogstashEncoder}), incluyendo el campo \texttt{trace\_id}. El agente Java de
+(\texttt{\seqsplit{LogstashEncoder}}), incluyendo el campo \texttt{trace\_id}. El agente Java de
 OpenTelemetry, adjuntado en tiempo de ejecución vía \texttt{-javaagent}, escribe automáticamente
 \texttt{trace\_id} y \texttt{span\_id} en el contexto de diagnóstico (MDC) de cada hilo que
 procesa una petición instrumentada —la configuración de Logback solo necesita leer esas dos
@@ -57,7 +57,7 @@ explícitamente en vez de presentar una instrumentación de cliente que no exist
 \subsection{Dashboard operativo}
 
 El dashboard de Grafana, versionado como JSON reproducible en
-\texttt{ops/grafana/pfc-dashboard.json}, incluye los seis paneles obligatorios: tasa de
+\texttt{\seqsplit{ops/grafana/pfc-dashboard.json}}, incluye los seis paneles obligatorios: tasa de
 peticiones, latencia p50/p95/p99, tasa de errores 5xx, disponibilidad Raft del cluster
 CockroachDB (nodos vivos, rangos no disponibles), uso de recursos por contenedor (vía cAdvisor,
 única forma práctica de obtener CPU/memoria por contenedor ya que los \texttt{/actuator/prometheus}

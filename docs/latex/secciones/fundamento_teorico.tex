@@ -209,7 +209,7 @@ menciona en el texto.
 \textbf{Tema} & \textbf{Artefacto} \\
 \midrule
 gRPC &
-  \texttt{services/telemetry-service/src/main/proto/telemetry.proto} y
+  \texttt{\seqsplit{services/telemetry-service/src/main/proto/telemetry.proto}} y
   \texttt{TelemetryGrpcService.java} (servidor); cliente real en
   \texttt{ZonaVentanaTelemetriaStrategy} de \texttt{svc-principal} \\
 Saga por coreografía sobre Kafka &
@@ -218,7 +218,7 @@ Saga por coreografía sobre Kafka &
   orquestador central; \texttt{TechnicianEventPublisher} en \texttt{auth-service} sigue el mismo
   patrón para \texttt{TechnicianCreatedEvent} \\
 CQRS &
-  Separación por servicio: \texttt{svc-principal/application/command/} concentra la escritura
+  Separación por servicio: \texttt{\seqsplit{svc-principal/application/command/}} concentra la escritura
   (\texttt{CreateTicketHandler}, \texttt{AssignTechnicianHandler},
   \texttt{UpdateTicketStatusHandler}); \texttt{report-service/application/ReportQueryService.java}
   concentra la lectura, sobre una proyección propia (\texttt{TicketSummary}) \\

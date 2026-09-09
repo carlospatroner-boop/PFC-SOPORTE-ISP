@@ -16,9 +16,9 @@ más una capa de carga, cada una respondiendo una pregunta que las demás no pue
 \textbf{Capa} & \textbf{Herramienta} & \textbf{Pregunta que responde} & \textbf{Resultado} \\
 \midrule
 Unitaria & JUnit 5 / Vitest / JUnit Android & ¿Esta clase, aislada, hace lo que dice? & 90/90 backend (5 servicios Java), 78/78 web, 5/5 móvil \\
-Integración & Testcontainers & ¿Funciona contra un CockroachDB real, no un \emph{mock}? & \texttt{TicketRepositoryIntegrationTest} \\
+Integración & Testcontainers & ¿Funciona contra un CockroachDB real, no un \emph{mock}? & \texttt{\seqsplit{TicketRepositoryIntegrationTest}} \\
 Contrato & Pact (consumidor + proveedor) & ¿El backend sigue la forma exacta que el cliente espera? & 2/2 consumidor, 2/2 proveedor \\
-E2E & Playwright / Compose Testing & ¿Todo el camino, navegador real incluido, funciona? & 9/9 en Chromium+Firefox+WebKit \\
+E2E & Playwright / Compose Testing & ¿Todo el camino, navegador real incluido, funciona? & 9/9 en \seqsplit{Chromium+Firefox+WebKit} \\
 Carga & Locust & ¿Aguanta concurrencia real? & Sección~\ref{sec:iso25010} \\
 \bottomrule
 \end{tabular}
@@ -63,7 +63,7 @@ pasar por los mismos controles~\cite{kim2021devops,humble2010continuous}:
 3 & \texttt{test-web} & Vitest, incluido el contrato Pact del consumidor \\
 4 & \texttt{test-mobile} & Unitarias JVM + instrumentadas en un emulador Android headless real \\
 5 & \texttt{build-images} & Construye y publica las siete imágenes Docker en GHCR (solo en \emph{push}) \\
-6 & \texttt{build-mobile-apk} & Compila el APK de depuración y lo publica como artefacto \\
+6 & \texttt{\seqsplit{build-mobile-apk}} & Compila el APK de depuración y lo publica como artefacto \\
 7 & \texttt{integration} & Levanta el \emph{stack} completo y corre Pact proveedor + Playwright contra el backend real \\
 \bottomrule
 \end{tabular}

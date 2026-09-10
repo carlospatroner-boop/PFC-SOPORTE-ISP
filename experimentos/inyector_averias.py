@@ -3,7 +3,7 @@ docs/adr/0008-correl-incidencias.md). Provoca una averia simulada en una zona: c
 reales (via la API, a traves del API Gateway, igual que un cliente real -- mismo criterio que
 tests/load/locustfile.py) para N abonados simulados, envia telemetria EQUIPO real al canal de
 PE-U1 (telemetry-service, puerto 9500) para esos mismos abonados, y deja constancia exacta de a
-quien afecto en experimentos/resultados/verdad_campo.csv.
+quien afecto en experimentos/resultados/verdad_campo_manual.csv.
 
 En un ISP real nadie sabe con certeza que abonados estaban afectados por una averia: se deduce
 despues, con error. Aqui la averia la provoca este mismo guion, asi que esa lista se conoce con
@@ -11,6 +11,12 @@ exactitud -- es lo que permite calcular precision/exhaustividad del agrupamiento
 respuesta conocida, sin discusion posible (ver experimentos/analizar_correlacion.py).
 
 Sin dependencias nuevas: solo la biblioteca estandar (urllib, socket, json, csv).
+
+Archivo de salida propio (verdad_campo_manual.csv), NO verdad_campo.csv: ese otro nombre lo
+escribe experimentos/correr_campana.py, con un esquema de columnas distinto (escenario, modo,
+repeticion, zone, ticket_id) para la campana automatizada completa. Antes ambos guiones escribian
+al mismo archivo con esquemas distintos -- cualquiera que los corriera en el orden equivocado
+obtenia un CSV con columnas mezcladas sin ningun aviso. Cada uno tiene ahora su propio archivo.
 
 Uso (con el stack levantado via docker compose):
     python experimentos/inyector_averias.py --zone QUEVEDO_CENTRO --abonados 8 --severidad ALTA
@@ -29,7 +35,10 @@ TELEMETRY_HOST = "localhost"
 TELEMETRY_PORT = 9500
 CLIENTE_EMAIL = "cliente@test.com"
 CLIENTE_PASSWORD = "Passw0rd!"
-VERDAD_CAMPO_CSV = "experimentos/resultados/verdad_campo.csv"
+# Cabecera propia de este guion -- distinta a la de correr_campana.py a proposito, para que
+# nunca puedan confundirse ni mezclarse si alguien corre los dos guiones sobre el mismo directorio.
+VERDAD_CAMPO_CSV_FIELDNAMES = ["abonado_id", "ticket_id", "zone", "instante", "severidad"]
+VERDAD_CAMPO_CSV = "experimentos/resultados/verdad_campo_manual.csv"
 
 
 def login():
@@ -98,9 +107,18 @@ def main():
         print(f"  {abonado_id} -> ticket {ticket_id}")
 
     escribir_csv = not os.path.exists(VERDAD_CAMPO_CSV)
+    if not escribir_csv:
+        with open(VERDAD_CAMPO_CSV, newline="", encoding="utf-8") as f:
+            cabecera_existente = next(csv.reader(f), [])
+        if cabecera_existente != VERDAD_CAMPO_CSV_FIELDNAMES:
+            raise SystemExit(
+                f"{VERDAD_CAMPO_CSV} ya existe con una cabecera distinta a la de este guion "
+                f"({cabecera_existente} != {VERDAD_CAMPO_CSV_FIELDNAMES}). No se escribe encima "
+                "para no mezclar dos formatos -- borre o mueva el archivo si de verdad quiere "
+                "empezar de cero.")
     os.makedirs(os.path.dirname(VERDAD_CAMPO_CSV), exist_ok=True)
     with open(VERDAD_CAMPO_CSV, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["abonado_id", "ticket_id", "zone", "instante", "severidad"])
+        writer = csv.DictWriter(f, fieldnames=VERDAD_CAMPO_CSV_FIELDNAMES)
         if escribir_csv:
             writer.writeheader()
         writer.writerows(filas)

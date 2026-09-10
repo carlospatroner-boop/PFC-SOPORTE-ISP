@@ -44,6 +44,12 @@ CLIENTE_EMAIL = "cliente@test.com"
 CLIENTE_PASSWORD = "Passw0rd!"
 RESULTS_DIR = Path(__file__).parent / "resultados"
 VERDAD_CAMPO_CSV = RESULTS_DIR / "verdad_campo.csv"
+# Cabecera propia de este guion. experimentos/inyector_averias.py (el guion de una sola
+# escena, corrido a mano) escribe a su propio archivo, verdad_campo_manual.csv, con una
+# cabecera distinta a proposito -- antes los dos escribian aqui mismo y con esquemas
+# distintos, y cualquiera que los corriera en el orden equivocado obtenia un CSV mezclado
+# sin ningun aviso.
+VERDAD_CAMPO_CSV_FIELDNAMES = ["escenario", "modo", "repeticion", "zone", "ticket_id"]
 CORRIDAS_CSV = RESULTS_DIR / "correlacion_corridas.csv"
 ANALISIS_JSON = RESULTS_DIR / "correlacion_analisis.json"
 
@@ -103,10 +109,19 @@ def correr_escenario(nombre: str, cfg: dict, modo: str, rep: int) -> dict:
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     escribir_encabezado = not VERDAD_CAMPO_CSV.exists()
+    if not escribir_encabezado:
+        with open(VERDAD_CAMPO_CSV, newline="", encoding="utf-8") as f:
+            cabecera_existente = next(csv.reader(f), [])
+        if cabecera_existente != VERDAD_CAMPO_CSV_FIELDNAMES:
+            raise SystemExit(
+                f"{VERDAD_CAMPO_CSV} ya existe con una cabecera distinta a la de este guion "
+                f"({cabecera_existente} != {VERDAD_CAMPO_CSV_FIELDNAMES}). main() ya lo borra al "
+                "empezar una campana nueva -- si ve este error es porque algo mas escribio ahi "
+                "por fuera del flujo normal. No se escribe encima para no mezclar formatos.")
     with open(VERDAD_CAMPO_CSV, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if escribir_encabezado:
-            w.writerow(["escenario", "modo", "repeticion", "zone", "ticket_id"])
+            w.writerow(VERDAD_CAMPO_CSV_FIELDNAMES)
         for zona, tid in verdad_local:
             w.writerow([nombre, modo, rep, zona, tid])
 
@@ -240,6 +255,11 @@ def main():
         json.dump(analisis, f, indent=2, ensure_ascii=False)
     print(f"Analisis guardado en {ANALISIS_JSON}")
     print(json.dumps(analisis, indent=2, ensure_ascii=False))
+
+    # Ultimo paso, a proposito: las sumas de verificacion se generan despues de que todos los
+    # datos crudos ya estan en su lugar final, para que nunca queden desfasadas respecto a ellos.
+    import generar_checksums
+    generar_checksums.generar_para(RESULTS_DIR)
 
 
 if __name__ == "__main__":

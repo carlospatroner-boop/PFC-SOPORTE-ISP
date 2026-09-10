@@ -3,7 +3,10 @@ Ampliacion del Modulo G, equipo ACC -- ver docs/adr/0008-correl-incidencias.md).
 
 Compara el agrupamiento real que produjo la estrategia CORREL activa (consultado via
 GET /api/v1/tickets/incidencias) contra la verdad de campo exacta que escribio
-experimentos/inyector_averias.py en experimentos/resultados/verdad_campo.csv.
+experimentos/inyector_averias.py en experimentos/resultados/verdad_campo_manual.csv (archivo
+propio de este par de guiones desde que se separo del que usa experimentos/correr_campana.py,
+que escribe verdad_campo.csv con un esquema de columnas distinto -- ver la cabecera de
+inyector_averias.py).
 
 Esto es una corrida MANUAL para probar que el mecanismo completo funciona de punta a punta con
 datos reales -- no es todavia la bateria estadistica completa de 100 corridas (10 repeticiones x
@@ -28,7 +31,7 @@ import urllib.request
 GATEWAY = "http://localhost:8000"
 CLIENTE_EMAIL = "cliente@test.com"
 CLIENTE_PASSWORD = "Passw0rd!"
-VERDAD_CAMPO_CSV = "experimentos/resultados/verdad_campo.csv"
+VERDAD_CAMPO_CSV = "experimentos/resultados/verdad_campo_manual.csv"
 
 
 def login():

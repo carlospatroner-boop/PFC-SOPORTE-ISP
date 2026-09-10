@@ -382,3 +382,47 @@ jobs:
       - name: Bajar el stack
         if: always()
         run: docker compose down -v
+
+  # ============================================================
+  # 8. compile-latex
+  # ============================================================
+  # No exigido por la rubrica de los 7 jobs (Modulo D), pero se agrega para no repetir el
+  # incidente real de esta entrega: el README recomendaba `texlive/texlive:latest-medium`
+  # para compilar docs/latex/main.tex, esa imagen no trae `hyphenat`/`seqsplit`, y el
+  # documento fallo con "! LaTeX Error: File 'hyphenat.sty' not found" sin que nada en CI
+  # lo detectara -- lo encontro el docente al compilar el, no el pipeline. Este job compila
+  # el manuscrito con la imagen completa (texlive/texlive:latest, la misma que documenta el
+  # README) en cada push, para que un paquete faltante o una referencia rota fallen aqui.
+  compile-latex:
+    runs-on: ubuntu-latest
+    container: texlive/texlive:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Compilar main.tex (4 pasadas: pdflatex, bibtex, pdflatex x2)"
+        working-directory: docs/latex
+        run: |
+          pdflatex -interaction=nonstopmode -halt-on-error main.tex
+          bibtex main
+          pdflatex -interaction=nonstopmode -halt-on-error main.tex
+          pdflatex -interaction=nonstopmode -halt-on-error main.tex
+
+      - name: Verificar cero referencias/citas indefinidas y cero etiquetas duplicadas
+        working-directory: docs/latex
+        run: |
+          if grep -qi "undefined" main.log; then
+            echo "Hay referencias o citas indefinidas en main.log:"
+            grep -i "undefined" main.log
+            exit 1
+          fi
+          if grep -qi "multiply.defined" main.log; then
+            echo "Hay etiquetas multiplemente definidas en main.log:"
+            grep -i "multiply.defined" main.log
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manuscrito-pdf
+          path: docs/latex/main.pdf
+          retention-days: 30

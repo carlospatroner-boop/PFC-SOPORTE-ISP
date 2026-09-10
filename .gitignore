@@ -52,3 +52,10 @@ Thumbs.db
 # Automatización local
 ejecutar_commits.py
 *.xlsx
+
+# Firma de la app movil: la clave privada de release NUNCA se versiona (el repositorio es
+# publico y clonable sin credenciales). El .apk ya firmado y su checksum si se versionan, en
+# release/apk/ -- ver README. Regenerar la clave localmente con las instrucciones de
+# apps/mobile/keystore/README.md si hace falta volver a firmar.
+apps/mobile/keystore/
+apps/mobile/release_output/

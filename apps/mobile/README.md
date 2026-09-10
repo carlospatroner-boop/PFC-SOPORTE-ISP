@@ -48,4 +48,36 @@ físico, cambiar esas URLs a la IP de LAN del host.
 - ⚠️ El cierre en sitio hoy solo actualiza el estado a `RESUELTO` (endpoint que ya existe). Falta
   que el backend acepte la foto y la ubicación del cierre — coordinar con el módulo de
   refactorización en capas antes de conectar ese último tramo.
-- CI (`test-mobile`, `build-mobile-apk`) pendiente de integrar al pipeline general del proyecto.
+- CI (`test-mobile`, `build-mobile-apk`) ya integrado al pipeline general (`.github/workflows/ci-cd.yml`).
+
+## Paquete instalable (release/apk/)
+
+El paquete firmado de esta entrega está en
+[`release/apk/soporte-isp.apk`](../../release/apk/soporte-isp.apk), junto a su suma de
+verificación SHA-256 en el mismo directorio (`release/apk/SHA256SUMS.txt`).
+
+**Instalar en un dispositivo o emulador con depuración USB habilitada:**
+
+```bash
+adb install release/apk/soporte-isp.apk
+```
+
+**Verificar antes de instalar** (que el archivo descargado sea exactamente el que el equipo
+firmó, sin alteración):
+
+```bash
+cd release/apk
+sha256sum -c SHA256SUMS.txt
+```
+
+**Verificar la firma del paquete en sí** (requiere `apksigner` de las *build-tools* del SDK de
+Android):
+
+```bash
+apksigner verify --verbose release/apk/soporte-isp.apk
+```
+
+La clave de firma es autofirmada (uso académico, sin publicación en una tienda), generada con
+`keytool` y validez de 10 000 días; el `.jks` en sí no se versiona porque el repositorio es
+público y clonable sin credenciales — comprometer una clave de firma versionada en un
+repositorio público es un riesgo real, no teórico.

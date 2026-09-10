@@ -1,27 +1,4 @@
 {
-  "inicio_utc": "2026-09-08T02:43:54Z",
-  "repeticiones_por_condicion": 5,
-  "escenarios": {
-    "Esc-2_averia_masiva": {
-      "abonados": 20,
-      "zonas": [
-        "QUEVEDO_CENTRO"
-      ]
-    },
-    "Esc-3_averia_mayor": {
-      "abonados": 60,
-      "zonas": [
-        "QUEVEDO_CENTRO"
-      ]
-    },
-    "Esc-4_dos_averias_simultaneas": {
-      "abonados": 20,
-      "zonas": [
-        "QUEVEDO_CENTRO",
-        "QUEVEDO_NORTE"
-      ]
-    }
-  },
   "por_modo": {
     "c0": {
       "n": 20,
@@ -52,15 +29,30 @@
     "prueba": "Mann-Whitney U (bilateral)",
     "estadistico_u": 400.0,
     "p_valor": 2.578045952721565e-09,
-    "vargha_delaney_a_c2_mayor_c0": 1.0
+    "vargha_delaney_a": 1.0,
+    "identicos_valor_a_valor": false
   },
+  "contraste_c1_vs_c2_exhaustividad": {
+    "prueba": "Mann-Whitney U (bilateral)",
+    "estadistico_u": null,
+    "p_valor": null,
+    "vargha_delaney_a": 0.5,
+    "identicos_valor_a_valor": true
+  },
+  "contraste_c1_vs_c2_precision": {
+    "prueba": "Mann-Whitney U (bilateral)",
+    "estadistico_u": null,
+    "p_valor": null,
+    "vargha_delaney_a": 0.5,
+    "identicos_valor_a_valor": true
+  },
+  "c1_y_c2_identicos_valor_a_valor": true,
   "fusion_erronea_esc4": {
     "n_corridas": 30,
     "fusiones_observadas": 0,
     "ic95_binomial": [
       0.0,
       0.0
-    ],
-    "nota": "La fusion cruzada de zona es estructuralmente imposible en esta implementacion (la correlacion filtra por zona antes de agrupar); 0 observadas es el resultado esperado y valida el particionado por zona, no una ausencia de prueba."
+    ]
   }
 }

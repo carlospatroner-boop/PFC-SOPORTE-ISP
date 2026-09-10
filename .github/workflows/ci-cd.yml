@@ -410,9 +410,12 @@ jobs:
       - name: Verificar cero referencias/citas indefinidas y cero etiquetas duplicadas
         working-directory: docs/latex
         run: |
-          if grep -qi "undefined" main.log; then
-            echo "Hay referencias o citas indefinidas en main.log:"
-            grep -i "undefined" main.log
+          # Coincide solo con las advertencias reales de pdflatex/bibtex sobre referencias,
+          # citas o etiquetas -- NO con "LaTeX Font Warning: ... undefined", que es un aviso
+          # de sustitucion de fuente inofensivo y comun (coincidia antes con un grep -i
+          # "undefined" demasiado amplio, dando un falso positivo en cada build).
+          if grep -Ei "Reference .* undefined|Citation .* undefined|There were undefined (references|citations)" main.log; then
+            echo "Hay referencias o citas indefinidas en main.log (ver arriba)."
             exit 1
           fi
           if grep -qi "multiply.defined" main.log; then

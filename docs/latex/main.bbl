@@ -118,6 +118,16 @@ M.~Kleppmann, {\em Designing Data-Intensive Applications: The Big Ideas Behind
 J.~L. Gustafson, ``Reevaluating amdahl's law,'' {\em Communications of the
   ACM}, vol.~31, no.~5, pp.~532--533, 1988.
 
+\bibitem{cockroachlabs2024docs}
+{Cockroach Labs}, ``{CockroachDB} documentation.''
+  \url{https://www.cockroachlabs.com/docs/}, 2024.
+\newblock Accedido: julio 2026.
+
+\bibitem{vargha2000critique}
+A.~Vargha and H.~D. Delaney, ``A critique and improvement of the {CL} common
+  language effect size statistics of {McGraw} and {Wong},'' {\em Journal of
+  Educational and Behavioral Statistics}, vol.~25, no.~2, pp.~101--132, 2000.
+
 \bibitem{martin2017clean}
 R.~C. Martin, {\em Clean Architecture: A Craftsman's Guide to Software
   Structure and Design}.
@@ -161,11 +171,6 @@ B.~H. Sigelman, L.~A. Barroso, M.~Burrows, P.~Stephenson, M.~Plakal, D.~Beaver,
 B.~Beyer, C.~Jones, J.~Petoff, and N.~R. Murphy, {\em Site Reliability
   Engineering: How Google Runs Production Systems}.
 \newblock Sebastopol, CA, USA: O'Reilly Media, 2016.
-
-\bibitem{cockroachlabs2024docs}
-{Cockroach Labs}, ``{CockroachDB} documentation.''
-  \url{https://www.cockroachlabs.com/docs/}, 2024.
-\newblock Accedido: julio 2026.
 
 \bibitem{brown2018c4model}
 S.~Brown, ``The {C4} model for visualising software architecture.''

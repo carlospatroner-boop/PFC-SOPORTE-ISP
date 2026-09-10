@@ -134,19 +134,50 @@ funcionaron, está en \texttt{docs/ci\_cd/informe\_ci\_cd.tex}.
 
 \subsection{Cobertura y complejidad ciclomática}
 
-La cobertura de \texttt{ticket-service}, medida con JaCoCo, alcanza el \textbf{81.1\,\%} de
-líneas del código propio, por encima del objetivo del 70\,\% que el proyecto se propuso desde la
-Entrega 3. Ese número no incluye el código generado automáticamente por \texttt{protobuf}/
+La cobertura de \texttt{ticket-service}, medida con JaCoCo, no se resume en una sola cifra:
+la Tabla~\ref{tab:cobertura-completa} reporta las tres métricas que la propia herramienta
+entrega, cada una nombrada, en vez de citar solo la más favorable (líneas) sin decir que es la
+de líneas.
+
+\begin{table}[H]
+\centering
+\caption{Cobertura de \texttt{ticket-service}, las tres métricas de JaCoCo}
+\label{tab:cobertura-completa}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Métrica} & \textbf{Cubierto} & \textbf{Total} & \textbf{\%} \\
+\midrule
+Líneas & 555 & 684 & \textbf{81.1\,\%} \\
+Instrucciones & 2582 & 3582 & 72.1\,\% \\
+Ramas & 88 & 154 & 57.1\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Las tres cifras son ciertas simultáneamente y miden cosas distintas: líneas cuenta sentencias
+ejecutadas, instrucciones cuenta a nivel de bytecode (más granular, penaliza más una rama sin
+cubrir dentro de una misma línea), y ramas cuenta específicamente las bifurcaciones
+condicionales (\texttt{if}/\texttt{switch}/operadores lógicos de corto circuito) — es la más
+exigente y la que queda más lejos del objetivo del 70\,\% que el proyecto se propuso desde la
+Entrega 3. El paquete concreto que más arrastra la cifra de ramas hacia abajo es
+\texttt{infrastructure.security} (filtro y configuración de JWT), con \textbf{0 de 38 líneas
+cubiertas}: ningún test ejercita las ramas de token inválido/expirado/ausente directamente sobre
+esas clases —sí se ejercitan indirectamente por las pruebas de integración HTTP 401/403, pero
+JaCoCo no atribuye esa cobertura a la clase que realmente decide el rechazo—, y queda declarado
+aquí como una brecha real en vez de diluirse en el promedio general.
+
+Ninguna de las tres cifras incluye el código generado automáticamente por \texttt{protobuf}/
 \texttt{grpc-java} a partir de \texttt{telemetry.proto} (\emph{getters}, \emph{setters} y
 constructores mecánicos sin lógica propia, que ninguna convención de pruebas exige cubrir a
 mano) — se excluye explícitamente en el \texttt{pom.xml} (perfil \texttt{coverage}), con un
 comentario que documenta por qué. Sin esa exclusión, ese código generado por sí solo diluía la
 cifra reportada de 59.3\,\% (antes de que \texttt{telemetry-service}/\texttt{CORREL} existieran)
 a un engañoso 42.7\,\%, contando en contra código que nadie prueba por convención en ningún
-proyecto Java real. El reporte HTML de JaCoCo que respalda esta cifra —no solo una tabla escrita
-a mano— está publicado en \texttt{docs/evidencias/jacoco-svc-principal/}, junto con el archivo
-binario crudo (\texttt{jacoco.exec}) para quien quiera regenerarlo o verificarlo con otra
-herramienta.
+proyecto Java real. El reporte HTML de JaCoCo que respalda estas tres cifras —no solo una tabla
+escrita a mano— está publicado en \texttt{docs/evidencias/jacoco-svc-principal/}, junto con el
+archivo crudo \texttt{jacoco.csv} del que se recalcularon directamente (no se re-tipearon a
+mano) y el binario crudo (\texttt{jacoco.exec}) para quien quiera regenerarlo o verificarlo con
+otra herramienta.
 
 Antes de escribir pruebas nuevas para esta entrega, el código propio (sin el generado) ya estaba
 en 64.4\,\%. Se identificaron con el propio reporte de JaCoCo las clases reales con mayor número

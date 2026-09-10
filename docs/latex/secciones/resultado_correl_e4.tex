@@ -26,22 +26,11 @@ candidatas por zona y ventana de 15 minutos sin distinguir de qué corrida provi
 
 \subsection{Resultado por configuración}
 
-\begin{table}[H]
-\centering
-\caption{Precisión y exhaustividad del agrupamiento por configuración CORREL (n=20 por
-configuración; mediana igual a la media en las 3 configuraciones por la separación completa
-observada)}
-\label{tab:resultado-correl}
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-\textbf{Configuración} & \textbf{Precisión} & \textbf{Exhaustividad} & \textbf{Incidencias efectivas (media)} \\
-\midrule
-\texttt{c0} (sin correlación)     & 1.00 & 0.04 & 30.0 \\
-\texttt{c1} (zona+ventana)        & 1.00 & 1.00 & 1.0  \\
-\texttt{c2} (zona+ventana+telemetría) & 1.00 & 1.00 & 1.0  \\
-\bottomrule
-\end{tabular}
-\end{table}
+% Tabla generada automáticamente por experimentos/generar_reporte_correl.py desde
+% experimentos/resultados/correlacion_corridas.csv -- no se edita a mano (cierra el hueco de
+% reproducibilidad señalado: "el paso del dato crudo a la tabla impresa no es reproducible sin
+% intervención manual").
+\input{secciones/generado/tabla_resultado_correl}
 
 La precisión es 1.00 en las tres configuraciones porque, dado el diseño de una sola avería por
 zona y ventana, ningún ticket ajeno a la avería inyectada entra jamás a la incidencia que se
@@ -60,6 +49,37 @@ exhaustividad observada superó a las 20 de \texttt{c0} sin una sola excepción�
 rechaza H0}: la diferencia entre correlacionar y no correlacionar es estadísticamente
 significativa y de magnitud máxima bajo esta métrica y esta escala.
 
+\subsection{Contraste \texttt{c1} vs \texttt{c2}: ¿aporta algo la telemetría?}
+\label{sec:contraste-c1-c2}
+
+La pregunta de investigación de esta sección compara tres configuraciones, no dos. El contraste
+anterior (\texttt{c2} contra \texttt{c0}) responde si correlacionar ayuda, pero no responde la
+pregunta que en realidad justifica construir \texttt{c2} sobre \texttt{c1}: ¿la telemetría de
+PE-U1 (Sección~\ref{sec:pe-u1-correl}) aporta algo que la sola coincidencia de zona y ventana
+(\texttt{c1}) no aporte ya?
+
+Comparando \texttt{c1} contra \texttt{c2} con Mann--Whitney U sobre las 20 corridas de cada una
+(precisión y exhaustividad) y sobre las incidencias efectivas: \textbf{los tres valores son
+idénticos, corrida por corrida}, en las 20 repeticiones. No hay una sola corrida donde
+\texttt{c1} y \texttt{c2} difieran. El tamaño del efecto de Vargha--Delaney es exactamente
+$\hat{A}_{12}=0.5$ (indistinguible al azar) porque no hay diferencia que medir.
+
+Esto es un resultado real, y hay que decirlo con la misma franqueza que el contraste de la
+Sección~\ref{sec:pipeline-paralelo}: \textbf{bajo el diseño experimental de esta entrega, la
+telemetría no aporta ninguna mejora medible sobre agrupar solo por zona y ventana}. La razón es
+estructural, no una falla de \texttt{c2}: en los tres escenarios ejecutados (Esc-2, Esc-3, Esc-4)
+cada avería inyectada envía telemetría real al canal PE-U1 exactamente en la misma zona y dentro
+de la misma ventana de 15 minutos en la que \texttt{c1} ya agrupa correctamente por sí solo —la
+telemetría corrobora una señal que la coincidencia de zona y tiempo ya había capturado, en vez de
+resolver un caso donde \texttt{c1} se equivocaría. El escenario donde la telemetría debería
+marcar una diferencia real es uno que \emph{no} se ejecutó en esta ronda: dos averías
+\emph{simultáneas dentro de la misma zona} (ver Sección~\ref{sec:que-falta-correl}), donde \texttt{c1}
+fundiría ambas por coincidir en zona y ventana, mientras que \texttt{c2} podría, en principio,
+usar el patrón de telemetría de cada grupo de equipos para separarlas. Sin ese escenario, la
+decisión de mantener \texttt{c2} en producción frente a quedarse con \texttt{c1} —más simple, sin
+dependencia de \texttt{telemetry-service}— no está decidida con dato, aunque el dato de esta
+ronda ya apunta a que \texttt{c1} solo no perdió nada frente a \texttt{c2}.
+
 \subsection{Control negativo y Escenario 4}
 
 El control negativo se cumple: bajo \texttt{c0}, Esc-3 (60 abonados) abrió en promedio 60
@@ -77,6 +97,7 @@ más interesante —dos averías simultáneas \emph{dentro de la misma zona}—,
 extensión natural del protocolo completo.
 
 \subsection{Qué falta para el protocolo completo}
+\label{sec:que-falta-correl}
 
 Esta corrida demuestra que el mecanismo mide algo real y reproducible, no solo que compila. Para
 el protocolo completo de la Sección~5.4 de la guía falta: subir a 10 repeticiones por condición,

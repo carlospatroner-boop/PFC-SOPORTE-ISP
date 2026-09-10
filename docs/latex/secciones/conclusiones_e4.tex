@@ -49,6 +49,48 @@ Lamport) nunca se construyó en ninguna entrega anterior --- se construyó por p
 entrega, junto con \texttt{CORREL} (ADR-0007, ADR-0008), y se documenta así explícitamente para
 no sugerir una continuidad que no existió.
 
+\subsection{Aporte de cada integrante}
+\label{sec:aporte-integrantes}
+
+La Tabla~\ref{tab:aporte-integrantes} declara, por área del repositorio, quién aportó la mayoría
+de las líneas según el historial de control de versiones (\texttt{git log --numstat}, excluyendo
+explícitamente dependencias y artefactos generados —por ejemplo \texttt{node\_modules/}, que en
+un commit aislado de julio infla artificialmente el recuento crudo del backend en más de 226\,000
+líneas si no se descarta—). Esta tabla no reemplaza al historial: quien quiera verificarla puede
+correr el mismo comando sobre las mismas rutas.
+
+\begin{table}[H]
+\centering
+\caption{Aporte por área, según líneas reales insertadas en el historial (dependencias y
+artefactos generados excluidos)}
+\label{tab:aporte-integrantes}
+\small
+\begin{tabular}{@{}p{4.2cm}p{9cm}@{}}
+\toprule
+\textbf{Área} & \textbf{Aporte principal} \\
+\midrule
+Backend (\texttt{services/}) & C. Pacheco 41\,\%, C. Carpio 27\,\%, R. Cando 25\,\%, J. Álvarez 7\,\% \\
+Aplicación web (\texttt{apps/web/}) & C. Carpio 98\,\% \\
+Aplicación móvil (\texttt{apps/mobile/}) & R. Cando 95\,\% \\
+Manuscrito (\texttt{docs/latex/}) & C. Pacheco 77\,\%, R. Cando 13\,\%, C. Carpio 11\,\% \\
+Experimentos (\texttt{experimentos/}, \texttt{spark/}) & R. Cando 76\,\%, C. Pacheco 18\,\% \\
+Observabilidad (\texttt{ops/}) & C. Pacheco 100\,\% \\
+CI/CD (\texttt{.github/}) & C. Carpio 71\,\%, J. Álvarez 17\,\% \\
+Arquitectura (\texttt{docs/adr/}, \texttt{docs/diagrams/}) & \textbf{J. Álvarez 46\,\%}, C. Pacheco 23\,\% \\
+Contratos (\texttt{pacts/}, OpenAPI) & \textbf{J. Álvarez 100\,\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La distribución es desigual por área, no por persona: cada uno de los cuatro integrantes es autor
+principal de al menos un área completa del repositorio. Jeremy Álvarez es, en particular, el autor
+único del contrato de interfaz OpenAPI y de las pruebas de contrato asociadas, y el principal de
+las tres vistas de arquitectura C4 —trabajo real y sustantivo que, sin embargo, no se tradujo en
+líneas del manuscrito LaTeX: su aporte ahí es de una sola sección de la Entrega 3
+(\texttt{conclusiones.tex}, julio) y esta misma tabla, escrita para esta entrega. Declararlo así,
+en vez de omitirlo, es más útil que una cifra de commits que por sí sola no distingue entre
+``no trabajó'' y ``trabajó en código y contratos, no en prosa''.
+
 \subsection{Contribuciones concretas de esta entrega}
 
 \begin{itemize}[nosep]

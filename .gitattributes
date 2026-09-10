@@ -1,0 +1,19 @@
+# Fija los finales de linea de los datos tabulares del experimento a LF, sin importar el
+# sistema operativo donde se generen o se clonen. Sin esto, un CSV generado en Windows (CRLF)
+# y verificado en Linux (LF) -- o viceversa -- cambia de suma de verificacion sin que el
+# contenido haya cambiado, que es justo el problema que este archivo evita.
+*.csv text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+
+# Binarios: nunca se normalizan finales de linea (evita corromperlos).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.exec binary
+*.apk binary
+*.docx binary

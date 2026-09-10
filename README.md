@@ -133,17 +133,32 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
   pdflatex -interaction=nonstopmode main.tex   # dos pasadas más para resolver referencias/bibliografía
   ```
   Requiere una distribución TeX Live completa (paquetes `babel`, `booktabs`, `hyperref`,
-  `enumitem`, entre otros). Si no se tiene TeX Live instalado localmente, se puede usar la imagen
-  Docker `texlive/texlive:latest-medium` montando `docs/` (no solo `docs/latex/`, porque las
-  figuras del manuscrito referencian `../diagrams/*.png` con ruta relativa) y ejecutando los
-  mismos cuatro comandos dentro del contenedor.
+  `enumitem`, `hyphenat`, `seqsplit`, entre otros). Si no se tiene TeX Live instalado localmente,
+  se puede usar la imagen Docker `texlive/texlive:latest` (la etiqueta `latest-medium` **no**
+  incluye `hyphenat`/`seqsplit` y falla con `! LaTeX Error: File 'hyphenat.sty' not found`)
+  montando `docs/` (no solo `docs/latex/`, porque las figuras del manuscrito referencian
+  `../diagrams/*.png` con ruta relativa) y ejecutando los mismos cuatro comandos dentro del
+  contenedor. Verificado: `docker run --rm -v "$(pwd)/docs:/docs" -w /docs/latex
+  texlive/texlive:latest bash -c "pdflatex ... && bibtex main && pdflatex ... && pdflatex ..."`
+  compila las 51 páginas sin errores.
 - Esquema de base de datos consolidado (referencia de lectura; los scripts que realmente se
   ejecutan siguen en `db-cluster/scripts/`): [`docs/db/schema.sql`](docs/db/schema.sql)
 - Puntos de entrada documentados a las pruebas de integración, E2E y contrato (el código real
   vive junto a cada módulo, no se duplica aquí): [`tests/`](tests/)
 - Protocolo y resultados experimentales (Spark, Entrega 3): [`docs/experimentos/protocolo.md`](docs/experimentos/protocolo.md)
 - Evaluación experimental ISO/IEC 25010 (Entrega 4): [`docs/experimentos/evaluacion_iso25010.md`](docs/experimentos/evaluacion_iso25010.md)
+- **Dos rutas de resultados, con dueños distintos — no es la misma carpeta duplicada:**
+  - [`resultados/locust/`](resultados/locust/) — datos crudos de las campañas de carga (Locust:
+    escenarios A/B, CSV de estadísticas/fallas/excepciones por corrida), producidos por
+    `tests/load/locustfile.py` y analizados por `resultados/locust/analizar_resultados.py`.
+  - [`experimentos/resultados/`](experimentos/resultados/) — datos crudos del experimento de
+    correlación CORREL (verdad de campo, corridas y análisis agregado), producidos por
+    `experimentos/correr_campana.py` y regenerados sin intervención manual con
+    `experimentos/generar_reporte_correl.py`.
 - Evidencia de tolerancia a fallos: `docs/evidencias/`
+- Paquete móvil firmado, listo para instalar: [`release/apk/`](release/apk/) — instrucciones de
+  instalación y verificación en [`apps/mobile/README.md`](apps/mobile/README.md#paquete-instalable-releaseapk)
+- Capturas reales de la web y la app móvil: [`release/screenshots/`](release/screenshots/)
 - Declaración de uso de IA: [`ai-usage-declaration.md`](ai-usage-declaration.md)
 - Actas de reunión (reconstruidas a partir del chat real de coordinación del equipo, con fecha,
   asistentes y decisiones reales): [`docs/actas_reunion.md`](docs/actas_reunion.md)

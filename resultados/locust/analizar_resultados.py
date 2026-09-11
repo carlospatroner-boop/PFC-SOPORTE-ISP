@@ -65,3 +65,11 @@ def analizar_escenario(nombre, n_runs=5):
 if __name__ == "__main__":
     analizar_escenario("escenarioA")
     analizar_escenario("escenarioB")
+
+    # Ultimo paso, a proposito: las sumas se regeneran despues de analizar, para que nunca
+    # queden desfasadas respecto a los CSV que Locust acaba de producir.
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "experimentos"))
+    import generar_checksums
+    generar_checksums.generar_para(Path(__file__).parent)

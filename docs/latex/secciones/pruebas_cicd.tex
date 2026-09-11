@@ -24,6 +24,27 @@ Carga & Locust & ¿Aguanta concurrencia real? & Sección~\ref{sec:iso25010} \\
 \end{tabular}
 \end{table}
 
+\subsubsection{Contrato de interfaz (OpenAPI)}
+\label{sec:contrato-openapi}
+
+Antes de que exista una sola prueba de contrato hace falta el contrato en sí. El archivo
+\texttt{docs/api/openapi.yaml} (OpenAPI~3.0.3) describe, de forma verificable por herramienta y no
+solo en prosa, los quince \emph{endpoints} REST de los cinco microservicios: alta, autenticación,
+refresco y validación de sesión (\texttt{auth-service}); creación, listado, cambio de estado y
+asignación de tickets (\texttt{ticket-service}); notificaciones; clasificación automática
+(\texttt{ai-service}); y los tres puntos de agregación de \texttt{report-service}, incluida la
+exportación a CSV. Cada operación declara su esquema de petición y respuesta, los códigos de
+estado posibles, y el esquema de seguridad (\texttt{bearerAuth}, JWT) cuando aplica.
+
+Este archivo no es un anexo estático: es la fuente que el contrato Pact de la siguiente
+subsección referencia como forma esperada, y es lo que permite a un integrante nuevo entender la
+API completa sin leer el código de los cinco servicios. Se actualizó para esta entrega —seguía
+describiendo los puertos directos de la Entrega 2 como si fueran la única vía de acceso, sin
+mencionar el API Gateway que desde la Entrega 4 es el punto de entrada real de ambos clientes
+(Sección~\ref{sec:arquitectura-e4})— para reflejar las dos rutas reales: el \emph{gateway} en el
+puerto 8000 como camino de producción, y los puertos directos de cada servicio conservados solo
+como vía de depuración local.
+
 \subsubsection{Pruebas de contrato}
 
 Se adoptó \emph{consumer-driven contract testing} con Pact entre \texttt{apps/web} (consumidor) y

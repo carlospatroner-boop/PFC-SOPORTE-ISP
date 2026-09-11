@@ -4,23 +4,38 @@ info:
   description: >
     Contrato REST de los 5 microservicios del PFC. Cada servicio corre en su
     propio puerto y mantiene su propia base de datos (auth_db / ticket_db /
-    notifications_db / ai_db / report_db) -- no hay un API Gateway todavía, así
-    que cada servidor de esta especificación apunta directo a un microservicio.
-  version: "3.0.0"
+    notifications_db / ai_db / report_db). Desde la Entrega 4 el punto de
+    entrada único para los clientes (web y móvil) es el API Gateway en el
+    puerto 8000, que reenvía cada prefijo /api/v1/<servicio>/** al
+    microservicio correspondiente sin reescribir la ruta (ver
+    services/api-gateway/src/main/resources/application.yml) -- los puertos
+    directos de cada servicio siguen respondiendo (útiles para depurar un
+    servicio en aislamiento) pero ya no son la vía real de acceso.
+  version: "4.0.0"
   contact:
     name: Equipo ACC — Aplicaciones Distribuidas (ISR-701), UTEQ
 
 servers:
+  - url: http://localhost:8000/api/v1/auth
+    description: auth-service, a través del API Gateway (Entrega 4, vía real)
+  - url: http://localhost:8000/api/v1/tickets
+    description: ticket-service, a través del API Gateway (Entrega 4, vía real)
+  - url: http://localhost:8000/api/v1/notifications
+    description: notification-service, a través del API Gateway (Entrega 4, vía real)
+  - url: http://localhost:8000/api/v1/ai
+    description: ai-service, a través del API Gateway (Entrega 4, vía real)
+  - url: http://localhost:8000/api/v1/reports
+    description: report-service, a través del API Gateway (Entrega 4, vía real)
   - url: http://localhost:8001/api/v1/auth
-    description: auth-service
+    description: auth-service, puerto directo (solo depuración local, Entrega 2)
   - url: http://localhost:8002/api/v1/tickets
-    description: ticket-service
+    description: ticket-service, puerto directo (solo depuración local, Entrega 2)
   - url: http://localhost:8003/api/v1/notifications
-    description: notification-service
+    description: notification-service, puerto directo (solo depuración local, Entrega 2)
   - url: http://localhost:8004/api/v1/ai
-    description: ai-service
+    description: ai-service, puerto directo (solo depuración local, Entrega 2)
   - url: http://localhost:8005/api/v1/reports
-    description: report-service
+    description: report-service, puerto directo (solo depuración local, Entrega 2)
 
 components:
   securitySchemes:

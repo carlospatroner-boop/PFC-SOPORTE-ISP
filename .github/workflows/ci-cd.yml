@@ -292,6 +292,49 @@ jobs:
           path: apps/mobile/app/build/outputs/apk/debug/*.apk
           retention-days: 14
 
+      # E5 de la rubrica de consolidacion, nivel 10: "el flujo automatico lo genera, lo
+      # firma y lo publica". Antes esto se hacia a mano (keytool + zipalign + apksigner
+      # corridos localmente, ver apps/mobile/README.md). El .jks nunca se versiona (el
+      # repo es publico) -- vive como secreto de GitHub Actions en base64
+      # (ANDROID_KEYSTORE_BASE64), decodificado aqui a un archivo temporal que el runner
+      # descarta al terminar el job.
+      - name: Compilar APK release (sin firmar)
+        working-directory: apps/mobile
+        run: ./gradlew :app:assembleRelease --console=plain
+
+      - name: Decodificar el keystore de firma
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
+
+      - name: Alinear y firmar el APK release
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
+          echo "Usando build-tools en $BUILD_TOOLS"
+          "${BUILD_TOOLS}zipalign" -v -p 4 \
+            apps/mobile/app/build/outputs/apk/release/app-release-unsigned.apk \
+            /tmp/app-release-aligned.apk
+          "${BUILD_TOOLS}apksigner" sign \
+            --ks /tmp/release.jks --ks-key-alias "$KS_ALIAS" --ks-pass "pass:$KS_PASS" \
+            --out release/apk/soporte-isp.apk /tmp/app-release-aligned.apk
+          "${BUILD_TOOLS}apksigner" verify --verbose release/apk/soporte-isp.apk
+          rm -f /tmp/release.jks /tmp/app-release-aligned.apk
+
+      - name: Generar suma de verificacion del APK firmado
+        run: |
+          cd release/apk
+          sha256sum soporte-isp.apk > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soporte-isp-release-firmado
+          path: |
+            release/apk/soporte-isp.apk
+            release/apk/SHA256SUMS.txt
+          retention-days: 90
+
   # ============================================================
   # 7. integration: levanta el stack COMPLETO (docker-compose.yml de la raiz: 3 nodos
   #    CockroachDB, Kafka, Mongo, los 6 microservicios, apps/web y observabilidad) y corre

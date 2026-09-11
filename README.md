@@ -162,6 +162,7 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
 - Declaración de uso de IA: [`ai-usage-declaration.md`](ai-usage-declaration.md)
 - Actas de reunión (reconstruidas a partir del chat real de coordinación del equipo, con fecha,
   asistentes y decisiones reales): [`docs/actas_reunion.md`](docs/actas_reunion.md)
+- Evidencia de tolerancia a fallos (cada archivo explicado): [`docs/evidencias/`](docs/evidencias/README.md)
 
 ## Novedades de la Entrega 4
 
@@ -186,6 +187,10 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
   (`c0`/`c1`/`c2`, variable de entorno `CORREL`) para agrupar tickets de una misma avería, la
   última con evidencia real de telemetría vía gRPC — ver
   [`docs/adr/0008-correl-incidencias.md`](docs/adr/0008-correl-incidencias.md).
+- Evidencia individual de cambios (capturas):
+  [`Evidencias de Modificaciones/Cristhian Pacheco/`](Evidencias%20de%20Modificaciones/Cristhian%20Pacheco/)
+- Paquete móvil firmado, listo para instalar: [`release/apk/`](release/apk/) — instrucciones de
+  instalación y verificación en [`apps/mobile/README.md`](apps/mobile/README.md#paquete-instalable-releaseapk)
 
 ## Licencia
 

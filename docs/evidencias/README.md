@@ -24,3 +24,10 @@ operativo, y así se declara en el manuscrito.
 `captura_demo_ticket_notificacion.png` (la composición original de julio de 2026) se conserva sin
 cambios: es una captura real de un solo trazo, no un montaje, y documenta la misma arquitectura de
 demo en la Entrega 3 (rutas directas a los microservicios, antes de que existiera `api-gateway`).
+
+## Guion del video de tolerancia a fallos
+
+[`guion_video_tolerancia_fallos.md`](guion_video_tolerancia_fallos.md) (y su versión
+[`.docx`](guion_video_tolerancia_fallos.docx)) es el guion que se siguió para grabar
+[`tolerancia_fallos.mp4`](tolerancia_fallos.mp4) — qué se muestra y en qué orden, para quien
+quiera reproducir la grabación o verificar que el video corresponde al guion planeado.

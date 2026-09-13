@@ -472,3 +472,27 @@ jobs:
           name: manuscrito-pdf
           path: docs/latex/main.pdf
           retention-days: 30
+
+
+  # ============================================================
+  # 9. verify-checksums: valida contra los datos crudos versionados que los tres manifiestos
+  #    de verificacion (experimentos, campana de carga, instalable movil) siguen coincidiendo.
+  #    Antes esto solo se comprobaba a mano; una discrepancia se detecta aqui sin intervencion
+  #    humana, en vez de descubrirse (o no) al leer el manuscrito.
+  # ============================================================
+  verify-checksums:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar SHA256SUMS.txt de experimentos/resultados
+        working-directory: experimentos/resultados
+        run: sha256sum -c SHA256SUMS.txt
+
+      - name: Verificar SHA256SUMS.txt de resultados/locust
+        working-directory: resultados/locust
+        run: sha256sum -c SHA256SUMS.txt
+
+      - name: Verificar SHA256SUMS.txt del instalable movil
+        working-directory: release/apk
+        run: sha256sum -c SHA256SUMS.txt

@@ -9,6 +9,7 @@
 *.py text eol=lf
 *.sh text eol=lf
 *.txt text eol=lf
+*.tex text eol=lf
 
 # Binarios: nunca se normalizan finales de linea (evita corromperlos).
 *.png binary

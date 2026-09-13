@@ -153,7 +153,8 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
     `tests/load/locustfile.py` y analizados por `resultados/locust/analizar_resultados.py`.
   - [`experimentos/resultados/`](experimentos/resultados/) — datos crudos del experimento de
     correlación CORREL (verdad de campo, corridas y análisis agregado), producidos por
-    `experimentos/correr_campana.py` y regenerados sin intervención manual con
+    `experimentos/correr_campana.py` (reproducible con `python experimentos/correr_campana.py --reps 5`)
+    y regenerados sin intervención manual con
     `experimentos/generar_reporte_correl.py`. `experimentos/inyector_averias.py` también
     escribe en esta carpeta (`verdad_campo_manual.csv`), para provocar una única avería a
     mano sin correr la campaña completa.

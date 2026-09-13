@@ -154,7 +154,9 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
   - [`experimentos/resultados/`](experimentos/resultados/) — datos crudos del experimento de
     correlación CORREL (verdad de campo, corridas y análisis agregado), producidos por
     `experimentos/correr_campana.py` y regenerados sin intervención manual con
-    `experimentos/generar_reporte_correl.py`.
+    `experimentos/generar_reporte_correl.py`. `experimentos/inyector_averias.py` también
+    escribe en esta carpeta (`verdad_campo_manual.csv`), para provocar una única avería a
+    mano sin correr la campaña completa.
 - Evidencia de tolerancia a fallos: `docs/evidencias/`
 - Paquete móvil firmado, listo para instalar: [`release/apk/`](release/apk/) — instrucciones de
   instalación y verificación en [`apps/mobile/README.md`](apps/mobile/README.md#paquete-instalable-releaseapk)

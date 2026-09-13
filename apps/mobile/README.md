@@ -57,11 +57,14 @@ El paquete firmado de esta entrega está en
 verificación SHA-256 en el mismo directorio (`release/apk/SHA256SUMS.txt`).
 
 **Generación automática.** El job `build-mobile-apk` de `.github/workflows/ci-cd.yml` compila,
-alinea (`zipalign`) y firma (`apksigner`) el APK de release en cada push, y lo publica como
-artefacto descargable del propio *run* (`soporte-isp-release-firmado`, 90 días de retención) junto
-con su suma recalculada — ya no es un paso manual. El `.jks` vive como secreto de GitHub Actions
-en base64 (`ANDROID_KEYSTORE_BASE64`, con `ANDROID_KEYSTORE_PASSWORD` y `ANDROID_KEY_ALIAS`),
-nunca en el repositorio.
+alinea (`zipalign`) y firma (`apksigner`) el APK de release en cada push, y lo publica en dos
+sitios: como artefacto descargable del propio *run* (`soporte-isp-release-firmado`, solo 90 días
+de retención — útil para depurar ese run puntual) y, además, como
+[GitHub Release](../../releases/tag/mobile-release) bajo el tag fijo `mobile-release`, que
+el mismo job actualiza en cada push a `main` — esa es la entrega estable: no expira y tiene URL
+permanente. Ya no es un paso manual. El `.jks` vive como secreto de GitHub Actions en base64
+(`ANDROID_KEYSTORE_BASE64`, con `ANDROID_KEYSTORE_PASSWORD` y `ANDROID_KEY_ALIAS`), nunca en el
+repositorio.
 
 **Instalar en un dispositivo o emulador con depuración USB habilitada:**
 

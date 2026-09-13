@@ -31,3 +31,7 @@ demo en la Entrega 3 (rutas directas a los microservicios, antes de que existier
 [`.docx`](guion_video_tolerancia_fallos.docx)) es el guion que se siguió para grabar
 [`tolerancia_fallos.mp4`](tolerancia_fallos.mp4) — qué se muestra y en qué orden, para quien
 quiera reproducir la grabación o verificar que el video corresponde al guion planeado.
+
+[`tolerancia_fallos_original_5m34s.mp4`](tolerancia_fallos_original_5m34s.mp4) es la toma
+completa sin editar (5 min 34 s) de la que se recortó la versión final; se conserva por
+transparencia, para quien quiera verificar que el corte no alteró el contenido mostrado.

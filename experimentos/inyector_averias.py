@@ -91,6 +91,22 @@ def main():
     parser.add_argument("--prefijo", default="ave", help="Prefijo del id de averia (para correr varias)")
     args = parser.parse_args()
 
+    # Validar la cabecera ANTES de crear tickets reales o enviar telemetria: si el CSV
+    # existente tiene una cabecera distinta, abortamos aqui, antes de cualquier efecto
+    # secundario real contra el sistema. Antes esta validacion corria despues del bucle de
+    # red, asi que un error de cabecera se detectaba solo cuando ya se habian creado tickets
+    # de verdad y enviado telemetria -- efectos que ya no se pueden deshacer.
+    escribir_csv = not os.path.exists(VERDAD_CAMPO_CSV)
+    if not escribir_csv:
+        with open(VERDAD_CAMPO_CSV, newline="", encoding="utf-8") as f:
+            cabecera_existente = next(csv.reader(f), [])
+        if cabecera_existente != VERDAD_CAMPO_CSV_FIELDNAMES:
+            raise SystemExit(
+                f"{VERDAD_CAMPO_CSV} ya existe con una cabecera distinta a la de este guion "
+                f"({cabecera_existente} != {VERDAD_CAMPO_CSV_FIELDNAMES}). No se escribe encima "
+                "para no mezclar dos formatos -- borre o mueva el archivo si de verdad quiere "
+                "empezar de cero.")
+
     print(f"Inyectando averia en {args.zone}: {args.abonados} abonados, severidad {args.severidad}")
     token = login()
 
@@ -106,16 +122,6 @@ def main():
         })
         print(f"  {abonado_id} -> ticket {ticket_id}")
 
-    escribir_csv = not os.path.exists(VERDAD_CAMPO_CSV)
-    if not escribir_csv:
-        with open(VERDAD_CAMPO_CSV, newline="", encoding="utf-8") as f:
-            cabecera_existente = next(csv.reader(f), [])
-        if cabecera_existente != VERDAD_CAMPO_CSV_FIELDNAMES:
-            raise SystemExit(
-                f"{VERDAD_CAMPO_CSV} ya existe con una cabecera distinta a la de este guion "
-                f"({cabecera_existente} != {VERDAD_CAMPO_CSV_FIELDNAMES}). No se escribe encima "
-                "para no mezclar dos formatos -- borre o mueva el archivo si de verdad quiere "
-                "empezar de cero.")
     os.makedirs(os.path.dirname(VERDAD_CAMPO_CSV), exist_ok=True)
     with open(VERDAD_CAMPO_CSV, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=VERDAD_CAMPO_CSV_FIELDNAMES)

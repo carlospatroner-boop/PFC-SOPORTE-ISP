@@ -98,15 +98,10 @@ def cambiar_modo(modo: str):
 
 def correr_escenario(nombre: str, cfg: dict, modo: str, rep: int) -> dict:
     prefijo = f"{nombre}-{modo}-r{rep}"
-    token = inyector.login()
-    verdad_local = set()
-    for zona in cfg["zonas"]:
-        for i in range(cfg["abonados"]):
-            abonado_id = f"{prefijo}-{zona}-{i}"
-            ticket_id = inyector.crear_ticket(token, zona, abonado_id)
-            inyector.enviar_telemetria_equipo(zona, abonado_id, cfg["severidad"])
-            verdad_local.add((zona, ticket_id))
 
+    # Validar la cabecera ANTES de crear tickets reales o enviar telemetria: si el archivo
+    # ya existe con una cabecera distinta -- por ejemplo, por una escritura fuera del flujo
+    # normal -- abortamos aqui, antes de cualquier efecto secundario real contra el sistema.
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     escribir_encabezado = not VERDAD_CAMPO_CSV.exists()
     if not escribir_encabezado:
@@ -118,6 +113,16 @@ def correr_escenario(nombre: str, cfg: dict, modo: str, rep: int) -> dict:
                 f"({cabecera_existente} != {VERDAD_CAMPO_CSV_FIELDNAMES}). main() ya lo borra al "
                 "empezar una campana nueva -- si ve este error es porque algo mas escribio ahi "
                 "por fuera del flujo normal. No se escribe encima para no mezclar formatos.")
+
+    token = inyector.login()
+    verdad_local = set()
+    for zona in cfg["zonas"]:
+        for i in range(cfg["abonados"]):
+            abonado_id = f"{prefijo}-{zona}-{i}"
+            ticket_id = inyector.crear_ticket(token, zona, abonado_id)
+            inyector.enviar_telemetria_equipo(zona, abonado_id, cfg["severidad"])
+            verdad_local.add((zona, ticket_id))
+
     with open(VERDAD_CAMPO_CSV, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if escribir_encabezado:

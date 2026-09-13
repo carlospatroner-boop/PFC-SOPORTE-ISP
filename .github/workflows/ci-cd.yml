@@ -269,6 +269,8 @@ jobs:
   build-mobile-apk:
     needs: [test-mobile]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -334,6 +336,28 @@ jobs:
             release/apk/soporte-isp.apk
             release/apk/SHA256SUMS.txt
           retention-days: 90
+
+      # El paso anterior deja el APK firmado solo como artefacto del run (GitHub lo borra
+      # a los 90 dias): sirve para depurar ESE run puntual, pero no es una entrega estable
+      # ni citable. Este paso publica el mismo APK como GitHub Release con un tag fijo
+      # (mobile-release), que este mismo job actualiza en cada push a main -- no expira, y
+      # da una URL permanente para el instalable, en vez de un artefacto temporal.
+      - name: Publicar el instalable como release estable (no como artefacto temporal)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobile-release
+          name: "Instalable móvil (release firmado)"
+          body: >
+            APK de release, compilado y firmado automaticamente por el job build-mobile-apk
+            de este mismo pipeline en cada push a main. Reemplaza al de la publicacion
+            anterior -- para el build asociado a un commit especifico, ver el artefacto
+            soporte-isp-release-firmado del run correspondiente.
+          files: |
+            release/apk/soporte-isp.apk
+            release/apk/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================================
   # 7. integration: levanta el stack COMPLETO (docker-compose.yml de la raiz: 3 nodos

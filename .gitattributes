@@ -11,6 +11,37 @@
 *.txt text eol=lf
 *.tex text eol=lf
 
+# Codigo fuente y configuracion: mismos finales de linea (LF) en todo el repositorio, sin
+# importar el sistema operativo del integrante que edite. Sin esto, un archivo editado en
+# Windows entra al historial en CRLF y el resto en LF, que es lo que ocurrio con secciones
+# del manuscrito y con el contrato OpenAPI.
+*.yaml text eol=lf
+*.yml text eol=lf
+*.java text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.properties text eol=lf
+*.proto text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.svg text eol=lf
+*.xml text eol=lf
+*.conf text eol=lf
+*.bib text eol=lf
+*.cff text eol=lf
+*.pro text eol=lf
+Dockerfile text eol=lf
+gradlew text eol=lf
+
+# Guiones de Windows: se declaran en CRLF a proposito, para que no queden indefinidos y
+# cambien de finales segun el equipo donde se clone.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
 # Binarios: nunca se normalizan finales de linea (evita corromperlos).
 *.png binary
 *.jpg binary
@@ -19,3 +50,7 @@
 *.exec binary
 *.apk binary
 *.docx binary
+*.gif binary
+*.jar binary
+*.pptx binary
+*.mp4 binary

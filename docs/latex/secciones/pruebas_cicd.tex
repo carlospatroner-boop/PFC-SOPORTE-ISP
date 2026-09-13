@@ -187,6 +187,15 @@ esas clases —sí se ejercitan indirectamente por las pruebas de integración H
 JaCoCo no atribuye esa cobertura a la clase que realmente decide el rechazo—, y queda declarado
 aquí como una brecha real en vez de diluirse en el promedio general.
 
+El reporte XML de JaCoCo agrega, a nivel de \texttt{<report>}, un total de 551/679 líneas —no
+las 555/684 que resultan de sumar el CSV fila por fila. La diferencia no es un error de cálculo:
+cinco archivos fuente (\texttt{AuthGatewayFilter.java}, \texttt{Incidencia.java},
+\texttt{Ticket.java}, \texttt{IncidenciaJpaEntity.java} y \texttt{TicketJpaEntity.java}) contienen
+dos clases cada uno —una externa y una interna o lambda generada por el compilador—, y el CSV
+reporta la cobertura por clase, de modo que las líneas físicas compartidas entre ambas clases del
+mismo archivo se cuentan dos veces al sumarlas. El XML, en cambio, agrega por archivo fuente y
+cuenta cada línea física una sola vez. Las cifras de instrucciones y ramas no sufren este efecto.
+
 Ninguna de las tres cifras incluye el código generado automáticamente por \texttt{protobuf}/
 \texttt{grpc-java} a partir de \texttt{telemetry.proto} (\emph{getters}, \emph{setters} y
 constructores mecánicos sin lógica propia, que ninguna convención de pruebas exige cubrir a
@@ -197,7 +206,7 @@ a un engañoso 42.7\,\%, contando en contra código que nadie prueba por convenc
 proyecto Java real. El reporte HTML de JaCoCo que respalda estas tres cifras —no solo una tabla
 escrita a mano— está publicado en \texttt{docs/evidencias/jacoco-svc-principal/}, junto con el
 archivo crudo \texttt{jacoco.csv} del que se recalcularon directamente (no se re-tipearon a
-mano) y el binario crudo (\texttt{jacoco.exec}) para quien quiera regenerarlo o verificarlo con
+mano) y el binario crudo (\texttt{jacoco-svc-principal-raw.exec}) para quien quiera regenerarlo o verificarlo con
 otra herramienta.
 
 Antes de escribir pruebas nuevas para esta entrega, el código propio (sin el generado) ya estaba

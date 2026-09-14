@@ -5,8 +5,6 @@ import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 /**
  * CORREL=c2: mismo criterio de zona+ventana que c1, mas una consulta real al canal de
@@ -20,16 +18,17 @@ import org.springframework.stereotype.Component;
  * no distingue CUAL averia. Cuando dos averias reales golpean la misma zona en la misma
  * ventana, c2 puede fundirlas igual que c1. Eso es intencional: el punto del Escenario 4 es
  * revelar ese error, no que esta estrategia lo evite (ver docs/adr/0008-correl-incidencias.md).
+ *
+ * Registrado como bean de Spring (nombre "c2") en
+ * infrastructure/config/DomainBeansConfig.java, no aqui -- domain no depende del framework;
+ * la propiedad correlation.window-minutes se resuelve alli, no en este constructor.
  */
-@Component("c2")
 public class ZonaVentanaTelemetriaStrategy implements CorrelationStrategy {
 
     private final TelemetryQueryPort telemetryQueryPort;
     private final long ventanaSegundos;
 
-    public ZonaVentanaTelemetriaStrategy(
-            TelemetryQueryPort telemetryQueryPort,
-            @Value("${correlation.window-minutes:15}") long ventanaMinutos) {
+    public ZonaVentanaTelemetriaStrategy(TelemetryQueryPort telemetryQueryPort, long ventanaMinutos) {
         this.telemetryQueryPort = telemetryQueryPort;
         this.ventanaSegundos = ventanaMinutos * 60;
     }

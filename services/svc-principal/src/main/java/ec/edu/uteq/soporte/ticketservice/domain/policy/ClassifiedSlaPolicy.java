@@ -1,7 +1,6 @@
 package ec.edu.uteq.soporte.ticketservice.domain.policy;
 
 import ec.edu.uteq.soporte.ticketservice.domain.Priority;
-import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Map;
@@ -10,8 +9,10 @@ import java.util.Map;
  * Estrategia usada una vez que ai-service clasifico el ticket y se conoce su prioridad real
  * (ver infrastructure/messaging/TicketClassificationListener). Mismos plazos que se usaban
  * hardcodeados antes del refactor, ahora nombrados y sustituibles.
+ *
+ * Registrado como bean de Spring en infrastructure/config/DomainBeansConfig.java, no aqui --
+ * domain no depende del framework.
  */
-@Component
 public class ClassifiedSlaPolicy implements SlaPolicy {
 
     private static final Map<Priority, Duration> SLA_POR_PRIORIDAD = Map.of(

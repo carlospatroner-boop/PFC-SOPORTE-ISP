@@ -1,18 +1,19 @@
 package ec.edu.uteq.soporte.ticketservice.domain.escalation;
 
 import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Ensambla la cadena a partir de los eslabones registrados como beans de Spring (ordenados
- * por @Order) y expone un unico punto de entrada. Quien use esta clase (ver
- * infrastructure/scheduling/EscalationScheduler) no necesita saber cuantos eslabones hay ni
- * en que orden se evaluan.
+ * Ensambla la cadena a partir de los eslabones que le pasen, en ese orden, y expone un unico
+ * punto de entrada. Quien use esta clase (ver infrastructure/scheduling/EscalationScheduler)
+ * no necesita saber cuantos eslabones hay ni en que orden se evaluan.
+ *
+ * Registrado como bean de Spring en infrastructure/config/DomainBeansConfig.java, que tambien
+ * decide el orden real de handlersInOrder (antes via @Order en cada eslabon) -- domain no
+ * depende del framework.
  */
-@Component
 public class EscalationChain {
 
     private final EscalationHandler first;

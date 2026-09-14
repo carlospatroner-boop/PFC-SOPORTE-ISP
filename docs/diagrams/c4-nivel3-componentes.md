@@ -134,11 +134,11 @@ C4Component
   dominio propio de `ticket-service` — es una réplica de solo lectura de datos que pertenecen a
   `auth-service`, necesaria únicamente para que `AssignTechnicianHandler` no viole la clave
   foránea `tickets_technician_id_fkey`. Por eso no aparece como puerto en el diagrama.
-- **Límite real, no el que publica el manuscrito todavía**: la Tabla "Las cuatro capas" de la
-  Sección de arquitectura dice que `domain` tiene "cero anotaciones Spring/JPA". Verificado contra
-  el árbol al construir este diagrama: eso es falso — hay 12 líneas `import
-  org.springframework.*` en 9 clases de `domain/` (`@Component`, `@Value`, `@Order`, todas para
-  que Spring pueda descubrir e inyectar las implementaciones de cada puerto). Ninguna es JPA
-  (`jakarta.persistence`), así que el límite de persistencia sí se respeta, pero el de framework
-  no. Corregirlo (mover el descubrimiento de beans a `infrastructure` o a clases `@Configuration`
-  explícitas) es trabajo pendiente, no resuelto por este diagrama.
+- **Corregido a partir de este diagrama**: construirlo contra el árbol real encontró que la Tabla
+  "Las cuatro capas" de la Sección de arquitectura decía que `domain` tiene "cero anotaciones
+  Spring/JPA" cuando en realidad había 12 líneas `import org.springframework.*` en 9 clases de
+  `domain/` (`@Component`, `@Value`, `@Order`, para que Spring descubriera e inyectara cada
+  implementación de un puerto). Se movieron esas 12 líneas a
+  `infrastructure/config/DomainBeansConfig.java` (mismos beans, mismos nombres, mismo orden de
+  la cadena de escalado) y se agregó `architecture/DomainArchitectureTest.java` (ArchUnit), que
+  rompe la construcción si `domain` vuelve a depender de Spring o de JPA.

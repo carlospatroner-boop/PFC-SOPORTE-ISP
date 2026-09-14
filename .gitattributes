@@ -1,3 +1,9 @@
+# Regla general de captura: cualquier archivo que Git detecte como texto y que no este
+# cubierto por una regla explicita mas abajo se normaliza a LF al entrar al historial. Sin
+# esta linea, una extension nueva entra al repositorio sin atributo y vuelve a quedar sujeta
+# al sistema operativo de quien la commitea, que es el problema que este archivo evita.
+* text=auto eol=lf
+
 # Fija los finales de linea de los datos tabulares del experimento a LF, sin importar el
 # sistema operativo donde se generen o se clonen. Sin esto, un CSV generado en Windows (CRLF)
 # y verificado en Linux (LF) -- o viceversa -- cambia de suma de verificacion sin que el
@@ -54,3 +60,13 @@ gradlew text eol=lf
 *.jar binary
 *.pptx binary
 *.mp4 binary
+
+# Archivos sin extension o con extension no cubierta arriba: se declaran uno por uno para
+# que ningun archivo versionado quede sin atributo explicito.
+.env.example    text eol=lf
+.gitattributes  text eol=lf
+.gitignore      text eol=lf
+LICENSE         text eol=lf
+*.bbl           text eol=lf
+*.blg           text eol=lf
+*.ipynb         text eol=lf

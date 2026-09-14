@@ -63,6 +63,44 @@ OTel Collector, Tempo, Prometheus, Grafana, cAdvisor & --- & Observabilidad (Sec
 \end{tabular}
 \end{table}
 
+\subsection{Vista de componentes (C4 Nivel 3)}
+\label{sec:c4-nivel3}
+
+El único servicio con arquitectura hexagonal completa es \texttt{ticket-service}
+(Sección~\ref{sec:hexagonal-e4}), así que es el que se documenta en este nivel del modelo:
+zoom a sus componentes reales, no a una aproximación. La Figura~\ref{fig:c4-nivel3} —fuente
+versionada en \texttt{docs/diagrams/c4-nivel3-componentes.md}— nombra cada caja igual que el
+árbol de \texttt{services/svc-principal/src/main/java/.../ticketservice/}: los seis patrones GoF
+de la Sección~\ref{sec:gof-e4} son visibles aquí, no solo enumerados en prosa.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{../diagrams/c4-nivel3-componentes.png}
+\caption{C4 Nivel 3 — componentes de \texttt{ticket-service}, Entrega 4.}
+\label{fig:c4-nivel3}
+\end{figure}
+
+Dos rutas del diagrama rompen deliberadamente la capa de aplicación, documentado en vez de
+ocultado: \texttt{IncidenciaController} consulta \texttt{IncidenciaRepository} directo (es una
+lectura simple, sin caso de uso que orquestar), y \texttt{TicketClassificationListener} opera
+sobre \texttt{TicketRepository} sin pasar por ningún \texttt{*CommandHandler} (el caso de uso
+real es aplicar una clasificación asíncrona llegada por Kafka, no una acción HTTP con
+autorización de rol). \texttt{TechnicianSyncListener} tampoco tiene puerto de dominio: escribe
+directo en una tabla de sincronización local que no representa un concepto propio de
+\texttt{ticket-service} --es una réplica de solo lectura de datos de \texttt{auth-service},
+necesaria para que \texttt{AssignTechnicianHandler} no viole la clave foránea
+\texttt{tickets\_technician\_id\_fkey}.
+
+Construir este diagrama contra el árbol real, y no contra la descripción en prosa que ya existía,
+encontró además una discrepancia en la Tabla~\ref{tab:capas-e4}: dice que \texttt{domain} tiene
+``cero anotaciones Spring/JPA''. Verificado con \texttt{grep} sobre el paquete: es falso para la
+parte de Spring --12 líneas \texttt{import org.springframework.*} en 9 clases
+(\texttt{@Component}, \texttt{@Value}, \texttt{@Order}, todas para que Spring descubra e inyecte
+cada implementación de un puerto)-- aunque cierto para JPA, que no aparece en ningún archivo de
+\texttt{domain}. Se corrige la afirmación en la Sección~\ref{sec:hexagonal-e4}; sacar esas doce
+líneas hacia clases \texttt{@Configuration} explícitas en \texttt{infrastructure} queda como
+trabajo pendiente, no resuelto por este diagrama.
+
 \subsection{Arquitectura hexagonal extendida}
 \label{sec:hexagonal-e4}
 
@@ -84,7 +122,10 @@ uniforme de interceptarlos.
 \midrule
 \texttt{presentation} & \texttt{TicketController}, DTOs & Traduce HTTP $\leftrightarrow$ comandos; sin lógica de negocio \\
 \texttt{application} & \texttt{*CommandHandler} & Orquesta el caso de uso; no conoce HTTP ni JPA \\
-\texttt{domain} & \texttt{Ticket}, puertos, políticas & Cero anotaciones Spring/JPA; se prueba con JUnit puro \\
+\texttt{domain} & \texttt{Ticket}, puertos, políticas & Cero JPA; 12 líneas de anotación Spring
+  (\texttt{@Component}/\texttt{@Value}/\texttt{@Order} para que Spring descubra cada
+  implementación de un puerto) en 9 de sus clases, ver Sección~\ref{sec:c4-nivel3}; se prueba con
+  JUnit puro \\
 \texttt{infrastructure} & Adaptadores, filtros, métricas, \emph{scheduler} & Implementa los puertos del dominio contra CockroachDB, Kafka y HTTP \\
 \bottomrule
 \end{tabular}
@@ -132,6 +173,7 @@ contra datos reales ya existentes, más los mismos dos rechazos). Las 15 pruebas
 haber cambiado ningún comportamiento observable del sistema.
 
 \subsection{Seis patrones GoF}
+\label{sec:gof-e4}
 
 Se implementaron seis patrones del catálogo de Gamma et al.~\cite{gamma1994patterns} —la unión
 del mínimo exigido por el Módulo A (Repository, Factory Method, Strategy) y del conjunto

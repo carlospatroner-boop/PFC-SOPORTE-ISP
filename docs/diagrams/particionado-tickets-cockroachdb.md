@@ -1,9 +1,13 @@
-# C4 Nivel 3 — Componentes: partición de `tickets` en CockroachDB
+# Partición de `tickets` en CockroachDB
 
 Zoom al cluster CockroachDB (`ticket_service`), mostrando la estrategia real de fragmentación
 tras la Entrega 3: **por fecha de apertura** (`PARTITION BY RANGE`), no por zona geográfica — ver
 [`docs/adr/0003-sharding-policy.md`](../adr/0003-sharding-policy.md) para la justificación completa
 del cambio y sus trade-offs.
+
+Este diagrama documenta el particionado físico de una tabla, no la vista de componentes del
+modelo C4 — antes vivía bajo el nombre `c4-nivel3-particionado.md`, lo cual generaba confusión con
+el nivel 3 real del modelo C4 (ver [`c4-nivel3-componentes.md`](c4-nivel3-componentes.md)).
 
 ```mermaid
 graph TB

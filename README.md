@@ -140,7 +140,7 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
   `../diagrams/*.png` con ruta relativa) y ejecutando los mismos cuatro comandos dentro del
   contenedor. Verificado: `docker run --rm -v "$(pwd)/docs:/docs" -w /docs/latex
   texlive/texlive:latest bash -c "pdflatex ... && bibtex main && pdflatex ... && pdflatex ..."`
-  compila las 56 páginas sin errores.
+  compila las 57 páginas sin errores.
 - Esquema de base de datos consolidado (referencia de lectura; los scripts que realmente se
   ejecutan siguen en `db-cluster/scripts/`): [`docs/db/schema.sql`](docs/db/schema.sql)
 - Puntos de entrada documentados a las pruebas de integración, E2E y contrato (el código real

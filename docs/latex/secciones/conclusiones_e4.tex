@@ -53,11 +53,17 @@ no sugerir una continuidad que no existió.
 \label{sec:aporte-integrantes}
 
 La Tabla~\ref{tab:aporte-integrantes} declara, por área del repositorio, quién aportó la mayoría
-de las líneas según el historial de control de versiones (\texttt{git log --numstat}, excluyendo
-explícitamente dependencias y artefactos generados —por ejemplo \texttt{node\_modules/}, que en
-un commit aislado de julio infla artificialmente el recuento crudo del backend en más de 226\,000
-líneas si no se descarta—). Esta tabla no reemplaza al historial: quien quiera verificarla puede
-correr el mismo comando sobre las mismas rutas.
+de las líneas según el historial de control de versiones. El método es el guion
+\texttt{scripts/aporte\_manuscrito.py}, que recorre \texttt{git log --numstat} sobre las rutas
+indicadas, mapea los dieciséis nombres de autor del historial a los cuatro correos reales, y
+descarta las dependencias y los artefactos generados: \texttt{node\_modules/}, \texttt{build/},
+\texttt{dist/}, \texttt{target/}, los archivos de bloqueo de dependencias y los artefactos de
+compilación de \LaTeX{} (\texttt{.bbl}, \texttt{.blg}, \texttt{.aux}, \texttt{.toc},
+\texttt{.out}, \texttt{.log}). Esa exclusión importa: sobre \texttt{docs/latex/} son 581 de las
+6.008 líneas insertadas, y sin descartarlas el aporte de C. Carpio al manuscrito pasa de un
+8,38\,\% real a un 10,45\,\% aparente. El método declarado en este epígrafe y el método aplicado
+en la tabla son el mismo guion, y cualquiera puede reproducir cada fila corriéndolo:
+\texttt{python scripts/aporte\_manuscrito.py docs/latex/ --commit <commit>}.
 
 \begin{table}[H]
 \centering
@@ -69,22 +75,23 @@ artefactos generados excluidos)}
 \toprule
 \textbf{Área} & \textbf{Aporte principal} \\
 \midrule
-Backend (\texttt{services/}) & C. Pacheco 41\,\%, C. Carpio 27\,\%, R. Cando 25\,\%, J. Álvarez 7\,\% \\
-Aplicación web (\texttt{apps/web/}) & C. Carpio 98\,\% \\
-Aplicación móvil (\texttt{apps/mobile/}) & R. Cando 95\,\% \\
-Manuscrito (\texttt{docs/latex/}) & C. Pacheco 75.87\,\%, R. Cando 11.66\,\%, C. Carpio 10.42\,\%, J. Álvarez 2.05\,\% \\
-Experimentos (\texttt{experimentos/}, \texttt{spark/}) & R. Cando 76\,\%, C. Pacheco 18\,\% \\
-Observabilidad (\texttt{ops/}) & C. Pacheco 100\,\% \\
-CI/CD (\texttt{.github/}) & C. Carpio 71\,\%, J. Álvarez 17\,\% \\
-Arquitectura (\texttt{docs/adr/}, \texttt{docs/diagrams/}) & \textbf{J. Álvarez 46\,\%}, C. Pacheco 23\,\% \\
-Contratos (\texttt{pacts/}, OpenAPI) & \textbf{J. Álvarez 100\,\%} \\
+Backend (\texttt{services/}) & C. Pacheco 40,69\,\%, C. Carpio 27,45\,\%, R. Cando 25,01\,\%, J. Álvarez 6,85\,\% \\
+Aplicación web (\texttt{apps/web/}) & C. Carpio 97,68\,\%, J. Álvarez 2,32\,\% \\
+Aplicación móvil (\texttt{apps/mobile/}) & R. Cando 97,65\,\%, C. Carpio 2,35\,\% \\
+Manuscrito (\texttt{docs/latex/}) & C. Pacheco 76,45\,\%, R. Cando 12,90\,\%, C. Carpio 8,38\,\%, J. Álvarez 2,27\,\% \\
+Experimentos (\texttt{experimentos/}, \texttt{spark/}) & R. Cando 73,78\,\%, C. Pacheco 17,71\,\%, C. Carpio 5,20\,\%, J. Álvarez 3,31\,\% \\
+Observabilidad (\texttt{ops/}) & C. Pacheco 100,00\,\% \\
+CI/CD (\texttt{.github/}) & C. Carpio 73,39\,\%, J. Álvarez 13,39\,\%, C. Pacheco 6,94\,\%, R. Cando 6,29\,\% \\
+Arquitectura (\texttt{docs/adr/}, \texttt{docs/diagrams/}) & \textbf{J. Álvarez 45,82\,\%}, C. Pacheco 22,52\,\%, R. Cando 16,28\,\%, C. Carpio 15,38\,\% \\
+Contratos (\texttt{pacts/}, \texttt{docs/api/}) & \textbf{J. Álvarez 100,00\,\%} \\
 \bottomrule
 \end{tabular}
 
 \vspace{2pt}
-{\footnotesize\textit{Nota: porcentajes calculados con \texttt{git log --numstat} sobre cada
-ruta indicada, tomados en el commit \texttt{18d9e57}. Ediciones posteriores a
-\texttt{docs/latex/} pueden desactualizar solo la fila de Manuscrito.}}
+{\footnotesize\textit{Nota: cada fila se reproduce con
+\texttt{python scripts/aporte\_manuscrito.py <rutas> --commit COMMIT\_ENTREGA}, tomada en el
+commit de la entrega. Las líneas de dependencias y de artefactos generados quedan fuera del
+denominador, como declara el epígrafe.}}
 \end{table}
 
 La distribución es desigual por área, no por persona: cada uno de los cuatro integrantes es autor

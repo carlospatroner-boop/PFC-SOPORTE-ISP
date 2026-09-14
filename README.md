@@ -140,7 +140,7 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
   `../diagrams/*.png` con ruta relativa) y ejecutando los mismos cuatro comandos dentro del
   contenedor. Verificado: `docker run --rm -v "$(pwd)/docs:/docs" -w /docs/latex
   texlive/texlive:latest bash -c "pdflatex ... && bibtex main && pdflatex ... && pdflatex ..."`
-  compila las 51 páginas sin errores.
+  compila las 56 páginas sin errores.
 - Esquema de base de datos consolidado (referencia de lectura; los scripts que realmente se
   ejecutan siguen en `db-cluster/scripts/`): [`docs/db/schema.sql`](docs/db/schema.sql)
 - Puntos de entrada documentados a las pruebas de integración, E2E y contrato (el código real
@@ -158,6 +158,18 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
     `experimentos/generar_reporte_correl.py`. `experimentos/inyector_averias.py` también
     escribe en esta carpeta (`verdad_campo_manual.csv`), para provocar una única avería a
     mano sin correr la campaña completa.
+- **Manifiestos de sumas de verificación (SHA-256) de los datos crudos.** Cada carpeta de
+  resultados lleva su propio `SHA256SUMS.txt`, en el formato que entiende `sha256sum -c`, y
+  hay un tercero para el instalable móvil. Se generan con
+  `python experimentos/generar_checksums.py` y se verifican así, desde un clon limpio:
+  ```bash
+  cd experimentos/resultados && sha256sum -c SHA256SUMS.txt && cd -
+  cd resultados/locust      && sha256sum -c SHA256SUMS.txt && cd -
+  cd release/apk            && sha256sum -c SHA256SUMS.txt && cd -
+  ```
+  Las tres verificaciones corren además en cada envío, sin condiciones que las salten, en el
+  trabajo `verify-checksums` del flujo `.github/workflows/ci-cd.yml`. Si un byte de cualquier
+  archivo de datos cambia sin regenerar el manifiesto, la construcción falla.
 - Evidencia de tolerancia a fallos: `docs/evidencias/`
 - Paquete móvil firmado, listo para instalar: [`release/apk/`](release/apk/) — instrucciones de
   instalación y verificación en [`apps/mobile/README.md`](apps/mobile/README.md#paquete-instalable-releaseapk)

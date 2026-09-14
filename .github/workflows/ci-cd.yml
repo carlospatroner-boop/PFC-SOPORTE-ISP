@@ -435,7 +435,12 @@ jobs:
 
       - name: Verificacion del PROVEEDOR del contrato Pact (contra el stack real)
         working-directory: services/svc-principal
-        run: mvn -B -Dtest=TicketServiceProviderPactTest -DRUN_CONTRACT_VERIFICATION=true test
+        # -Djacoco.skip=true: esta corrida ejercita un unico test contra el stack ya
+        # levantado en Docker (el codigo real corre en el contenedor, no en esta JVM de
+        # Maven), asi que JaCoCo mediria 0% aqui y rompería la compuerta del 70% sin
+        # razon -- la cobertura real del modulo ya se mide en el job test-backend, que si
+        # corre la suite completa.
+        run: mvn -B -Dtest=TicketServiceProviderPactTest -DRUN_CONTRACT_VERIFICATION=true -Djacoco.skip=true test
 
       - uses: actions/setup-node@v4
         with:

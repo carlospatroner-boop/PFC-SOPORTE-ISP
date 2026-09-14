@@ -62,6 +62,25 @@ jobs:
         run: ./gradlew :app:lintDebug --console=plain
 
   # ============================================================
+  # validate-openapi: rompe la construccion si alguna operacion de docs/api/openapi.yaml deja
+  # de declarar content/schema en su respuesta de exito (regla propia response-schema-required
+  # en .spectral.yaml). Nace de la correccion E4/Entrega 4: el profesor senalo 4 operaciones sin
+  # esquema, y al revisar el contrato completo eran 11 de 17 -- esta regla evita que vuelva a
+  # pasar sin que el CI lo note.
+  # ============================================================
+  validate-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Spectral lint sobre docs/api/openapi.yaml
+        run: npx --yes @stoplight/spectral-cli lint docs/api/openapi.yaml --ruleset .spectral.yaml --fail-severity=error
+
+  # ============================================================
   # 2. test-backend: los 4 servicios Java (Maven) + notification-service (Node) +
   #    ai-service (Python). svc-principal incluye las pruebas de integracion con
   #    Testcontainers (CockroachDB real en Docker, ver TicketRepositoryIntegrationTest.java)

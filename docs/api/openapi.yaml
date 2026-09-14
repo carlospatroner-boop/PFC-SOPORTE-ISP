@@ -47,7 +47,11 @@ components:
   schemas:
     ApiResponse:
       type: object
-      description: Envoltura estándar de respuesta usada por auth-service, ticket-service y report-service.
+      description: >
+        Envoltura estándar de respuesta. auth-service, ticket-service y report-service (Java) la
+        producen con la misma clase ApiResponse; notification-service (Node) construye a mano un
+        objeto con la misma forma. ai-service (FastAPI) es la única excepción: devuelve el
+        documento sin envolver (ver /classifications/{ticket_id}).
       properties:
         data: {}
         message:
@@ -93,6 +97,10 @@ components:
           format: date-time
         slaBreached:
           type: boolean
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
 
     CreateTicketRequest:
       type: object
@@ -109,6 +117,150 @@ components:
           type: string
         address:
           type: string
+
+    AuthResponse:
+      type: object
+      description: Par de tokens emitido por /login y rotado por /refresh.
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+
+    LogoutRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    UserResponse:
+      type: object
+      description: Cuenta devuelta por el CRUD de administración. Nunca incluye la contraseña ni su hash.
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [CLIENTE, TECNICO, ADMIN]
+        zone:
+          type: string
+          nullable: true
+          description: Solo se rellena para role=TECNICO.
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    NotificationEvent:
+      type: object
+      description: Notificación simulada (demo/depuración, notification-service no envía correo/SMS real).
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        zone:
+          type: string
+        eventType:
+          type: string
+          enum: [ticket.created, ticket.status-changed, ticket.assigned]
+        channel:
+          type: string
+          enum: [EMAIL, SMS]
+        message:
+          type: string
+        simulated:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Classification:
+      type: object
+      description: Clasificación automática guardada por ai-service para un ticket.
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        zone:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [CONECTIVIDAD, DNS, HARDWARE, CONFIGURACION, VELOCIDAD]
+        priority:
+          type: string
+          enum: [CRITICO, ALTO, MEDIO, BAJO]
+        suggestion:
+          type: string
+        classifiedAt:
+          type: string
+          format: date-time
+
+    SummaryResponse:
+      type: object
+      description: Agregados del modelo de lectura CQRS de report-service.
+      properties:
+        totalTickets:
+          type: integer
+          format: int64
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        byZone:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        byCategory:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+
+    TicketSummaryResponse:
+      type: object
+      description: Fila del modelo de lectura CQRS (report-service), no el mismo objeto que Ticket.
+      properties:
+        zone:
+          type: string
+        ticketId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        technicianId:
+          type: string
+          format: uuid
+          nullable: true
+        category:
+          type: string
+        priority:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
   responses:
     Unauthorized:
@@ -183,7 +335,16 @@ paths:
               properties:
                 refreshToken: { type: string }
       responses:
-        "200": { description: Nuevo par access/refresh token }
+        "200":
+          description: Nuevo par access/refresh token
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/AuthResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /logout:
@@ -191,8 +352,17 @@ paths:
       tags: [auth-service]
       summary: Revoca un refresh token
       security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LogoutRequest" }
       responses:
-        "200": { description: Sesión cerrada }
+        "200":
+          description: Sesión cerrada (data siempre null)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
 
   /validate:
     get:
@@ -228,14 +398,34 @@ paths:
                   type: string
                   description: Obligatorio si role=TECNICO, prohibido en otro caso
       responses:
-        "201": { description: Cuenta creada }
+        "201":
+          description: Cuenta creada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/UserResponse" }
         "403": { $ref: "#/components/responses/Forbidden" }
     get:
       tags: [auth-service]
       summary: Listar todas las cuentas (solo ADMIN)
       security: [{ bearerAuth: [] }]
       responses:
-        "200": { description: Lista de usuarios }
+        "200":
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/UserResponse" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
   /:
@@ -267,7 +457,18 @@ paths:
           in: query
           schema: { type: string }
       responses:
-        "200": { description: Lista de tickets visibles para el rol autenticado }
+        "200":
+          description: Lista de tickets visibles para el rol autenticado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/Ticket" }
 
   /{id}:
     get:
@@ -308,7 +509,16 @@ paths:
               properties:
                 status: { type: string, enum: [NUEVO, ASIGNADO, EN_PROGRESO, ESCALADO, RESUELTO, CERRADO] }
       responses:
-        "200": { description: Estado actualizado }
+        "200":
+          description: Estado actualizado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Ticket" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
   /{id}/assign:
@@ -326,7 +536,16 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses:
-        "200": { description: Técnico asignado }
+        "200":
+          description: Técnico asignado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/Ticket" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
   /notifications:
@@ -338,7 +557,18 @@ paths:
           in: query
           schema: { type: string, format: uuid }
       responses:
-        "200": { description: Lista de notificaciones simuladas }
+        "200":
+          description: Lista de notificaciones simuladas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/NotificationEvent" }
 
   /classifications/{ticket_id}:
     get:
@@ -350,7 +580,11 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses:
-        "200": { description: category/priority/suggestion clasificados }
+        "200":
+          description: category/priority/suggestion clasificados (ai-service devuelve el documento sin envoltura ApiResponse)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Classification" }
         "404": { description: Aún no se procesó ese ticket }
 
   /summary:
@@ -359,7 +593,16 @@ paths:
       summary: Agregados del modelo de lectura CQRS (solo ADMIN)
       security: [{ bearerAuth: [] }]
       responses:
-        "200": { description: totalTickets/byStatus/byZone/byCategory }
+        "200":
+          description: totalTickets/byStatus/byZone/byCategory
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data: { $ref: "#/components/schemas/SummaryResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -379,7 +622,18 @@ paths:
           in: query
           schema: { type: string }
       responses:
-        "200": { description: Lista de TicketSummaryResponse }
+        "200":
+          description: Lista de TicketSummaryResponse
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/TicketSummaryResponse" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
   /export.csv:

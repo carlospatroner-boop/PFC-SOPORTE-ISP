@@ -5,7 +5,6 @@ import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import org.springframework.stereotype.Component;
 
 /**
  * CORREL=c1: agrupa por zona y ventana deslizante. Si ya existe una Incidencia abierta en la
@@ -16,8 +15,10 @@ import org.springframework.stereotype.Component;
  * de zona+tiempo, sin corroborar que realmente este pasando algo ahi. Esto es a proposito --
  * es exactamente lo que el Escenario 4 (dos averias simultaneas) del protocolo experimental
  * pone a prueba: agrupar solo por zona+ventana puede fundir dos averias distintas en una.
+ *
+ * Registrado como bean de Spring (nombre "c1") en
+ * infrastructure/config/DomainBeansConfig.java, no aqui -- domain no depende del framework.
  */
-@Component("c1")
 public class ZonaVentanaStrategy implements CorrelationStrategy {
 
     @Override

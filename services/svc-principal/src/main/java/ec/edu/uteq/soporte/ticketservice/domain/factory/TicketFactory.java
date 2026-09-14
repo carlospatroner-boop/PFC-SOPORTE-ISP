@@ -4,7 +4,6 @@ import ec.edu.uteq.soporte.ticketservice.domain.Ticket;
 import ec.edu.uteq.soporte.ticketservice.domain.TicketStatus;
 import ec.edu.uteq.soporte.ticketservice.domain.Zone;
 import ec.edu.uteq.soporte.ticketservice.domain.policy.SlaPolicy;
-import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -18,8 +17,10 @@ import java.util.UUID;
  * Con la fabrica, "crear un ticket nuevo" es una sola operacion con nombre, reutilizable desde
  * cualquier otro punto de entrada que el sistema necesite en el futuro (alta administrativa,
  * importacion masiva, etc.) sin duplicar las reglas de creacion.
+ *
+ * Registrado como bean de Spring en infrastructure/config/DomainBeansConfig.java, no aqui --
+ * domain no depende del framework.
  */
-@Component
 public class TicketFactory {
 
     private final SlaPolicy defaultSlaPolicy;

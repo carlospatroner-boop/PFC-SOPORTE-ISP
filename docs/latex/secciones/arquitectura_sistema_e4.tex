@@ -92,14 +92,16 @@ necesaria para que \texttt{AssignTechnicianHandler} no viole la clave foránea
 \texttt{tickets\_technician\_id\_fkey}.
 
 Construir este diagrama contra el árbol real, y no contra la descripción en prosa que ya existía,
-encontró además una discrepancia en la Tabla~\ref{tab:capas-e4}: dice que \texttt{domain} tiene
-``cero anotaciones Spring/JPA''. Verificado con \texttt{grep} sobre el paquete: es falso para la
+encontró además una discrepancia en la Tabla~\ref{tab:capas-e4}: decía que \texttt{domain} tiene
+``cero anotaciones Spring/JPA''. Verificado con \texttt{grep} sobre el paquete: era falso para la
 parte de Spring --12 líneas \texttt{import org.springframework.*} en 9 clases
 (\texttt{@Component}, \texttt{@Value}, \texttt{@Order}, todas para que Spring descubra e inyecte
 cada implementación de un puerto)-- aunque cierto para JPA, que no aparece en ningún archivo de
-\texttt{domain}. Se corrige la afirmación en la Sección~\ref{sec:hexagonal-e4}; sacar esas doce
-líneas hacia clases \texttt{@Configuration} explícitas en \texttt{infrastructure} queda como
-trabajo pendiente, no resuelto por este diagrama.
+\texttt{domain}. Se movieron esas doce líneas a
+\texttt{infrastructure/config/DomainBeansConfig.java} (Sección~\ref{sec:hexagonal-e4}), y se
+agregó una prueba ArchUnit (\texttt{architecture/DomainArchitectureTest.java}) que falla la
+construcción si \texttt{domain} vuelve a depender de Spring o de JPA -- ya no depende de que
+alguien lo note leyendo el código a mano.
 
 \subsection{Arquitectura hexagonal extendida}
 \label{sec:hexagonal-e4}
@@ -122,10 +124,9 @@ uniforme de interceptarlos.
 \midrule
 \texttt{presentation} & \texttt{TicketController}, DTOs & Traduce HTTP $\leftrightarrow$ comandos; sin lógica de negocio \\
 \texttt{application} & \texttt{*CommandHandler} & Orquesta el caso de uso; no conoce HTTP ni JPA \\
-\texttt{domain} & \texttt{Ticket}, puertos, políticas & Cero JPA; 12 líneas de anotación Spring
-  (\texttt{@Component}/\texttt{@Value}/\texttt{@Order} para que Spring descubra cada
-  implementación de un puerto) en 9 de sus clases, ver Sección~\ref{sec:c4-nivel3}; se prueba con
-  JUnit puro \\
+\texttt{domain} & \texttt{Ticket}, puertos, políticas & Cero anotaciones Spring/JPA, verificado
+  con una prueba ArchUnit que rompe la construcción si deja de serlo (ver
+  Sección~\ref{sec:c4-nivel3}); se prueba con JUnit puro \\
 \texttt{infrastructure} & Adaptadores, filtros, métricas, \emph{scheduler} & Implementa los puertos del dominio contra CockroachDB, Kafka y HTTP \\
 \bottomrule
 \end{tabular}

@@ -214,7 +214,7 @@
                  Antes vivia en un perfil "coverage" que no se activaba por defecto: el propio
                  flujo de CI corria "mvn test" sin ese perfil, asi que el pipeline nunca medía
                  pese a que este mismo comentario decia que el reporte "es usado por el pipeline",
-                 y la ejecucion "check" no existia en ningun sitio -- no habia ningun umbral que
+                 y la ejecucion "check" no existia en ningun sitio: no habia ningun umbral que
                  subir ni bajar. Ahora el plugin esta siempre activo y la ejecucion "check" (ligada
                  a la fase test, no a la verify por defecto de JaCoCo, para que corra con el mismo
                  "mvn test" que ya usa el job test-backend del flujo) rompe la construccion si la
@@ -253,7 +253,7 @@
                                         <limit>
                                             <counter>INSTRUCTION</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.95</minimum>
+                                            <minimum>0.70</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

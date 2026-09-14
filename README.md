@@ -108,7 +108,7 @@ documenta qué se puede sobreescribir si se corre algún servicio suelto, fuera 
 | Unitarias backend (Java) | `mvn test` | `services/auth-service`, `services/svc-principal`, `services/report-service` |
 | Unitarias backend (Node) | `npm test` | `services/notification-service` |
 | Unitarias backend (Python) | `pytest tests/ -v` | `services/ai-service` |
-| Cobertura (JaCoCo) | `mvn test -Pcoverage` | `services/svc-principal` (reporte en `target/site/jacoco/`) |
+| Cobertura (JaCoCo) | `mvn test` | `services/svc-principal` (reporte en `target/site/jacoco/`; el mismo `mvn test` falla si la cobertura de instrucciones del módulo cae por debajo del 70%) |
 | Componente + contrato Pact (web) | `npm test` | `apps/web` |
 | Contrato Pact (proveedor) | `mvn test -Dtest=TicketServiceProviderPactTest -DRUN_CONTRACT_VERIFICATION=true` | `services/svc-principal` (requiere el stack completo levantado) |
 | E2E (Chromium/Firefox/WebKit) | `npx playwright test` | `apps/web` |

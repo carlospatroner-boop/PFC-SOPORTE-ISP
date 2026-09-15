@@ -141,6 +141,14 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
   contenedor. Verificado: `docker run --rm -v "$(pwd)/docs:/docs" -w /docs/latex
   texlive/texlive:latest bash -c "pdflatex ... && bibtex main && pdflatex ... && pdflatex ..."`
   compila las 57 páginas sin errores.
+- **Documento vivo vs. documento congelado (Entregable 26 de la guía de cierre).** `docs/latex/`
+  de arriba es el documento vivo: se sigue editando y su PDF se recompila en cada `push` a `main`
+  (tanto en CI como en el [Release `mobile-release`](../../releases/tag/mobile-release)), así que
+  descargarlo hoy y mañana puede dar bytes distintos sin ningún aviso de cuál commit corresponde a
+  cuál. [`docs/entregas-congeladas/entrega4/`](docs/entregas-congeladas/entrega4/) es la instantánea
+  congelada de esta entrega: un PDF fechado y atado a un commit exacto (`50024c4`, 2026-09-15) que
+  no se vuelve a recompilar ni a sobrescribir, para poder citar una versión verificable en vez de
+  "el PDF de hoy".
 - Esquema de base de datos consolidado (referencia de lectura; los scripts que realmente se
   ejecutan siguen en `db-cluster/scripts/`): [`docs/db/schema.sql`](docs/db/schema.sql)
 - Puntos de entrada documentados a las pruebas de integración, E2E y contrato (el código real

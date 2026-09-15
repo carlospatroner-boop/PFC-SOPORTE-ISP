@@ -508,6 +508,24 @@ paths:
               required: [status]
               properties:
                 status: { type: string, enum: [NUEVO, ASIGNADO, EN_PROGRESO, ESCALADO, RESUELTO, CERRADO] }
+                evidencePhotoBase64:
+                  type: string
+                  format: byte
+                  nullable: true
+                  description: >-
+                    Foto de evidencia del cierre en sitio, codificada en Base64. Opcional: solo
+                    la manda la app móvil cuando status=RESUELTO (Entregable 10 de la guía de
+                    cierre); en cualquier otra transición el servicio la ignora aunque llegue.
+                latitude:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: Latitud GPS capturada al cerrar en sitio. Opcional, mismo caso que evidencePhotoBase64.
+                longitude:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: Longitud GPS capturada al cerrar en sitio. Opcional, mismo caso que evidencePhotoBase64.
       responses:
         "200":
           description: Estado actualizado

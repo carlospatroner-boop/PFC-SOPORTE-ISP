@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -93,7 +94,11 @@ public class TicketController {
             @Valid @RequestBody UpdateStatusRequest request,
             @RequestAttribute("authRole") String role,
             @RequestAttribute(required = false) Zone authZone) {
-        UpdateTicketStatusCommand command = new UpdateTicketStatusCommand(id, request.status(), role, authZone);
+        byte[] evidencePhoto = request.evidencePhotoBase64() != null
+                ? Base64.getDecoder().decode(request.evidencePhotoBase64())
+                : null;
+        UpdateTicketStatusCommand command = new UpdateTicketStatusCommand(
+                id, request.status(), role, authZone, evidencePhoto, request.latitude(), request.longitude());
         Ticket updated = updateTicketStatusHandler.handle(command);
         return ApiResponse.of(TicketResponse.from(updated), "Estado actualizado");
     }

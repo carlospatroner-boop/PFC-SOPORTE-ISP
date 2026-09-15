@@ -45,9 +45,11 @@ físico, cambiar esas URLs a la IP de LAN del host.
 - ✅ Login contra `/api/v1/auth/login`, JWT en `EncryptedSharedPreferences`.
 - ✅ Listado de tickets asignados con caché offline (Room) y *pull-to-refresh*.
 - ✅ Detalle de ticket + captura de foto (cámara) y ubicación (GPS) — las 2 capacidades exigidas.
-- ⚠️ El cierre en sitio hoy solo actualiza el estado a `RESUELTO` (endpoint que ya existe). Falta
-  que el backend acepte la foto y la ubicación del cierre — coordinar con el módulo de
-  refactorización en capas antes de conectar ese último tramo.
+- ✅ Cierre en sitio con evidencia (Entregable 10 de la guía de cierre): la foto y las
+  coordenadas GPS capturadas se envían con el cambio de estado a `RESUELTO`, con reintento
+  ante fallos de red, y el backend las guarda junto al ticket (ver
+  `TicketRepository.closeOnSite` y `UpdateTicketStatusHandler.java`). Antes del Entregable 10,
+  el cierre solo actualizaba el estado — la evidencia se quedaba dentro del teléfono.
 - CI (`test-mobile`, `build-mobile-apk`) ya integrado al pipeline general (`.github/workflows/ci-cd.yml`).
 
 ## Paquete instalable (release/apk/)

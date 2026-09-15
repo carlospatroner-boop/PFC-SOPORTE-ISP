@@ -47,6 +47,17 @@ public class UpdateTicketStatusHandler implements TicketCommandHandler<UpdateTic
                     ticket.getSlaDeadline() != null
                             && ticket.getResolvedAt().isAfter(ticket.getSlaDeadline())
             );
+            // Evidencia del cierre en sitio (Entregable 10 de la guia de cierre): opcional a
+            // proposito -- un ADMIN puede resolver un ticket sin pasar por el movil.
+            if (command.evidencePhoto() != null) {
+                ticket.setEvidencePhoto(command.evidencePhoto());
+            }
+            if (command.evidenceLatitude() != null) {
+                ticket.setEvidenceLatitude(command.evidenceLatitude());
+            }
+            if (command.evidenceLongitude() != null) {
+                ticket.setEvidenceLongitude(command.evidenceLongitude());
+            }
         }
         Ticket saved = ticketWriter.saveWithRetry(ticket);
         publishStatusChanged(saved, oldStatus);

@@ -79,4 +79,15 @@ public class TicketJpaEntity {
 
     @Column(name = "sla_breached")
     private boolean slaBreached;
+
+    // Evidencia del cierre en sitio (Entregable 10 de la guia de cierre, columnas agregadas en
+    // db/migration/V3__add_close_evidence.sql). Nulas salvo en el cierre desde el movil.
+    @Column(name = "evidence_photo")
+    private byte[] evidencePhoto;
+
+    @Column(name = "evidence_latitude")
+    private Double evidenceLatitude;
+
+    @Column(name = "evidence_longitude")
+    private Double evidenceLongitude;
 }

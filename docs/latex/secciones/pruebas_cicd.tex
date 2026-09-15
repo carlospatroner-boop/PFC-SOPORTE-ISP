@@ -216,15 +216,25 @@ cuenta cada línea física una sola vez. Las cifras de instrucciones y ramas no 
 Ninguna de las tres cifras incluye el código generado automáticamente por \texttt{protobuf}/
 \texttt{grpc-java} a partir de \texttt{telemetry.proto} (\emph{getters}, \emph{setters} y
 constructores mecánicos sin lógica propia, que ninguna convención de pruebas exige cubrir a
-mano) — se excluye explícitamente en el \texttt{pom.xml} (perfil \texttt{coverage}), con un
-comentario que documenta por qué. Sin esa exclusión, ese código generado por sí solo diluía la
-cifra reportada de 59.3\,\% (antes de que \texttt{telemetry-service}/\texttt{CORREL} existieran)
-a un engañoso 42.7\,\%, contando en contra código que nadie prueba por convención en ningún
-proyecto Java real. El reporte HTML de JaCoCo que respalda estas tres cifras —no solo una tabla
-escrita a mano— está publicado en \texttt{docs/evidencias/jacoco-svc-principal/}, junto con el
-archivo crudo \texttt{jacoco.csv} del que se recalcularon directamente (no se re-tipearon a
-mano) y el binario crudo (\texttt{jacoco-svc-principal-raw.exec}) para quien quiera regenerarlo o verificarlo con
+mano) — se excluye explícitamente en el \texttt{pom.xml}, con un comentario que documenta por
+qué. Sin esa exclusión, ese código generado por sí solo diluía la cifra reportada de 59.3\,\%
+(antes de que \texttt{telemetry-service}/\texttt{CORREL} existieran) a un engañoso 42.7\,\%,
+contando en contra código que nadie prueba por convención en ningún proyecto Java real. El
+reporte HTML de JaCoCo que respalda estas tres cifras —no solo una tabla escrita a mano— está
+publicado en \texttt{docs/evidencias/jacoco-svc-principal/}, junto con el archivo crudo
+\texttt{jacoco.csv} del que se recalcularon directamente (no se re-tipearon a mano) y el binario
+crudo (\texttt{jacoco-svc-principal-raw.exec}) para quien quiera regenerarlo o verificarlo con
 otra herramienta.
+
+Hasta esta entrega, el objetivo del 70\,\% del Módulo A no se hacía cumplir: JaCoCo vivía en un
+perfil Maven que no se activaba por defecto (\texttt{mvn test -Pcoverage}), el flujo de CI corría
+\texttt{mvn test} sin ese perfil, y la ejecución \texttt{check} —la que compara contra un
+umbral y puede romper la construcción— no existía en ningún sitio. El pipeline nunca medía nada,
+pese a que el propio comentario del \texttt{pom.xml} decía que el reporte «es usado por el
+pipeline». Se movió el complemento fuera del perfil (ahora siempre activo) y se agregó una
+ejecución \texttt{check} con un umbral del 70\,\% sobre el contador de instrucciones, ligada a la
+misma fase \texttt{test} que ya corre en \texttt{test-backend}: si la cobertura cae por debajo de
+ese umbral, \texttt{mvn test} falla con la razón exacta.
 
 Antes de escribir pruebas nuevas para esta entrega, el código propio (sin el generado) ya estaba
 en 64.4\,\%. Se identificaron con el propio reporte de JaCoCo las clases reales con mayor número

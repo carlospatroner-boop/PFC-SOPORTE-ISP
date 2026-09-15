@@ -209,53 +209,73 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Cobertura de pruebas unitarias (Modulo A, salida esperada: "sube a >= 70%").
+                 Antes vivia en un perfil "coverage" que no se activaba por defecto: el propio
+                 flujo de CI corria "mvn test" sin ese perfil, asi que el pipeline nunca medía
+                 pese a que este mismo comentario decia que el reporte "es usado por el pipeline",
+                 y la ejecucion "check" no existia en ningun sitio: no habia ningun umbral que
+                 subir ni bajar. Ahora el plugin esta siempre activo y la ejecucion "check" (ligada
+                 a la fase test, no a la verify por defecto de JaCoCo, para que corra con el mismo
+                 "mvn test" que ya usa el job test-backend del flujo) rompe la construccion si la
+                 cobertura de instrucciones del modulo cae por debajo del 70% declarado como
+                 objetivo. Verificado subiendo el umbral a un valor por encima de la cobertura
+                 real: "mvn test" falla con la razon exacta (instructions covered ratio is X, but
+                 expected minimum is Y). -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.11</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+                <configuration>
+                    <!-- Excluye el codigo generado automaticamente por protobuf/grpc-java a
+                         partir de telemetry.proto (getters/setters/builders mecanicos, sin
+                         logica propia, que nadie prueba a mano; practica estandar de
+                         JaCoCo). Sin esta exclusion, el boilerplate generado diluia el
+                         numero real de cobertura del codigo que si escribimos: bajaba de
+                         59.3% (antes de este generador) a 42.7% (con el generador incluido,
+                         contando en contra codigo que nunca se prueba por convencion),
+                         cuando el codigo propio esta en realidad en 64.4% antes de las
+                         pruebas de esta seccion. -->
+                    <excludes>
+                        <exclude>ec/edu/uteq/soporte/telemetryservice/infrastructure/grpc/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <!-- Cobertura de pruebas unitarias (Modulo A, salida esperada: "sube a >= 70%").
-             En un perfil aparte (no activo por defecto) para que "mvn test" normal siga
-             funcionando sin conexion a internet. Correr "mvn test -Pcoverage" para generar
-             el reporte en target/site/jacoco/index.html (usado por el pipeline de CI/CD). -->
-        <profile>
-            <id>coverage</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.jacoco</groupId>
-                        <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>0.8.11</version>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>prepare-agent</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>report</id>
-                                <phase>test</phase>
-                                <goals>
-                                    <goal>report</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <!-- Excluye el codigo generado automaticamente por protobuf/grpc-java a
-                                 partir de telemetry.proto (getters/setters/builders mecanicos, sin
-                                 logica propia, que nadie prueba a mano; practica estandar de
-                                 JaCoCo). Sin esta exclusion, el boilerplate generado diluia el
-                                 numero real de cobertura del codigo que si escribimos: bajaba de
-                                 59.3% (antes de este generador) a 42.7% (con el generador incluido,
-                                 contando en contra codigo que nunca se prueba por convencion),
-                                 cuando el codigo propio esta en realidad en 64.4% antes de las
-                                 pruebas de esta seccion. -->
-                            <excludes>
-                                <exclude>ec/edu/uteq/soporte/telemetryservice/infrastructure/grpc/**</exclude>
-                            </excludes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>

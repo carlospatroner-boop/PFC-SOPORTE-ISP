@@ -52,11 +52,46 @@ class UpdateTicketStatusHandlerTest {
         when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
         when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Ticket result = handler().handle(new UpdateTicketStatusCommand(id, TicketStatus.RESUELTO, "ADMIN", null));
+        Ticket result = handler().handle(new UpdateTicketStatusCommand(id, TicketStatus.RESUELTO, "ADMIN", null, null, null, null));
 
         assertThat(result.getStatus()).isEqualTo(TicketStatus.RESUELTO);
         assertThat(result.getResolvedAt()).isNotNull();
         assertThat(result.isSlaBreached()).isTrue();
+    }
+
+    @Test
+    void updateStatus_toResuelto_withEvidence_persistsPhotoAndCoordinates() {
+        UUID id = UUID.randomUUID();
+        Ticket existing = ticketIn(Zone.QUEVEDO_SUR, id);
+        existing.setStatus(TicketStatus.EN_PROGRESO);
+
+        when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
+        when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        byte[] photo = {1, 2, 3, 4};
+        Ticket result = handler().handle(
+                new UpdateTicketStatusCommand(id, TicketStatus.RESUELTO, "TECNICO", Zone.QUEVEDO_SUR, photo, -1.02, -79.46));
+
+        assertThat(result.getEvidencePhoto()).isEqualTo(photo);
+        assertThat(result.getEvidenceLatitude()).isEqualTo(-1.02);
+        assertThat(result.getEvidenceLongitude()).isEqualTo(-79.46);
+    }
+
+    @Test
+    void updateStatus_toAsignado_ignoresEvidenceEvenIfSent() {
+        UUID id = UUID.randomUUID();
+        Ticket existing = ticketIn(Zone.QUEVEDO_SUR, id);
+        when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
+        when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // La evidencia solo tiene sentido en el cierre en sitio (RESUELTO); si llegara en
+        // cualquier otra transicion, el manejador no debe guardarla.
+        Ticket result = handler().handle(
+                new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "TECNICO", Zone.QUEVEDO_SUR, new byte[]{9}, 1.0, 2.0));
+
+        assertThat(result.getEvidencePhoto()).isNull();
+        assertThat(result.getEvidenceLatitude()).isNull();
+        assertThat(result.getEvidenceLongitude()).isNull();
     }
 
     @Test
@@ -67,7 +102,7 @@ class UpdateTicketStatusHandlerTest {
         when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
         when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Ticket result = handler().handle(new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "TECNICO", zone));
+        Ticket result = handler().handle(new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "TECNICO", zone, null, null, null));
 
         assertThat(result.getStatus()).isEqualTo(TicketStatus.ASIGNADO);
     }
@@ -79,7 +114,7 @@ class UpdateTicketStatusHandlerTest {
         when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> handler().handle(
-                new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "TECNICO", Zone.QUEVEDO_SUR)))
+                new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "TECNICO", Zone.QUEVEDO_SUR, null, null, null)))
                 .isInstanceOf(ForbiddenException.class);
     }
 
@@ -90,7 +125,7 @@ class UpdateTicketStatusHandlerTest {
         when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> handler().handle(
-                new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "TECNICO", null)))
+                new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "TECNICO", null, null, null, null)))
                 .isInstanceOf(ForbiddenException.class);
     }
 
@@ -101,7 +136,7 @@ class UpdateTicketStatusHandlerTest {
         when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> handler().handle(
-                new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "CLIENTE", null)))
+                new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "CLIENTE", null, null, null, null)))
                 .isInstanceOf(ForbiddenException.class);
     }
 
@@ -113,7 +148,7 @@ class UpdateTicketStatusHandlerTest {
         when(ticketRepository.findByTicketId(id)).thenReturn(Optional.of(existing));
         when(ticketWriter.saveWithRetry(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Ticket result = handler().handle(new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "ADMIN", null));
+        Ticket result = handler().handle(new UpdateTicketStatusCommand(id, TicketStatus.ASIGNADO, "ADMIN", null, null, null, null));
 
         ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
         org.mockito.Mockito.verify(eventPublisher).publish(topicCaptor.capture(), any(), any());

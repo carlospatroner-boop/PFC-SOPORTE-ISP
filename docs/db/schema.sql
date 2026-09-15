@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS tickets (
     sla_deadline    TIMESTAMPTZ,
     resolved_at     TIMESTAMPTZ,
     sla_breached    BOOL DEFAULT FALSE,
+    -- Evidencia del cierre en sitio (Entregable 10 de la guia de cierre, agregadas en
+    -- db/migration/V3__add_close_evidence.sql). Nulas salvo en el cierre desde el movil.
+    evidence_photo      BYTES,
+    evidence_latitude   FLOAT8,
+    evidence_longitude  FLOAT8,
     PRIMARY KEY (created_at, id)
 ) PARTITION BY RANGE (created_at) (
     PARTITION tickets_2026_q1 VALUES FROM (MINVALUE) TO ('2026-04-01T00:00:00Z'),

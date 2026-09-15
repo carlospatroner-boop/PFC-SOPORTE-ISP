@@ -38,4 +38,11 @@ public class Ticket {
     private OffsetDateTime slaDeadline;
     private OffsetDateTime resolvedAt;
     private boolean slaBreached;
+
+    // Evidencia del cierre en sitio (Entregable 10 de la guia de cierre): solo se llenan
+    // cuando el tecnico cierra el ticket desde el movil con foto + GPS. Nulas en cualquier
+    // otra transicion de estado.
+    private byte[] evidencePhoto;
+    private Double evidenceLatitude;
+    private Double evidenceLongitude;
 }

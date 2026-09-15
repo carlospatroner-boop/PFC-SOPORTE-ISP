@@ -24,6 +24,9 @@ public class TicketMapper {
                 .slaDeadline(entity.getSlaDeadline())
                 .resolvedAt(entity.getResolvedAt())
                 .slaBreached(entity.isSlaBreached())
+                .evidencePhoto(entity.getEvidencePhoto())
+                .evidenceLatitude(entity.getEvidenceLatitude())
+                .evidenceLongitude(entity.getEvidenceLongitude())
                 .build();
     }
 
@@ -44,6 +47,9 @@ public class TicketMapper {
                 .slaDeadline(ticket.getSlaDeadline())
                 .resolvedAt(ticket.getResolvedAt())
                 .slaBreached(ticket.isSlaBreached())
+                .evidencePhoto(ticket.getEvidencePhoto())
+                .evidenceLatitude(ticket.getEvidenceLatitude())
+                .evidenceLongitude(ticket.getEvidenceLongitude())
                 .build();
     }
 }

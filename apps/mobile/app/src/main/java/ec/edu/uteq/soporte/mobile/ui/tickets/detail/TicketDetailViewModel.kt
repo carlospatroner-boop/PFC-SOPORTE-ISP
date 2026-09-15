@@ -54,11 +54,19 @@ class TicketDetailViewModel(
         _uiState.update { it.copy(capturedLatitude = latitude, capturedLongitude = longitude) }
     }
 
-    fun closeOnSite() {
-        if (!_uiState.value.canCloseOnSite) return
+    /**
+     * evidencePhotoBytes lo lee la pantalla (necesita Context/ContentResolver para abrir el
+     * URI de la foto, ver TicketDetailScreen) justo antes de llamar aqui -- el ViewModel no
+     * depende de Context, como el resto de este modulo.
+     */
+    fun closeOnSite(evidencePhotoBytes: ByteArray) {
+        val state = _uiState.value
+        if (!state.canCloseOnSite) return
+        val latitude = state.capturedLatitude ?: return
+        val longitude = state.capturedLongitude ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isClosing = true, errorMessage = null) }
-            val result = ticketRepository.closeOnSite(ticketId)
+            val result = ticketRepository.closeOnSite(ticketId, evidencePhotoBytes, latitude, longitude)
             result.fold(
                 onSuccess = { updated ->
                     _uiState.update { it.copy(isClosing = false, ticket = updated, closeSucceeded = true) }

@@ -57,6 +57,15 @@ data class TicketResponse(
     val slaBreached: Boolean,
 )
 
+/**
+ * Coincide con UpdateStatusRequest.java del backend (Entregable 10 de la guia de cierre):
+ * los tres campos de evidencia son opcionales -- Gson por defecto no serializa campos null
+ * (no se llama .serializeNulls() en NetworkModule), asi que un cierre normal sin evidencia
+ * simplemente no los manda, igual que antes de agregar este soporte.
+ */
 data class UpdateStatusRequest(
     val status: TicketStatus,
+    val evidencePhotoBase64: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )

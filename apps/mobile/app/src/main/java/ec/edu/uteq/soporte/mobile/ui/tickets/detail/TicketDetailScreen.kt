@@ -86,6 +86,7 @@ fun TicketDetailScreen(ticketId: String, onBack: () -> Unit, onClosed: () -> Uni
     )
     val uiState by viewModel.uiState.collectAsState()
     var showConfirmCloseDialog by remember { mutableStateOf(false) }
+    var showLocationConsentDialog by remember { mutableStateOf(false) }
 
     val pendingPhotoUri = remember {
         val evidenceDir = File(context.cacheDir, "evidencia").apply { mkdirs() }
@@ -337,9 +338,12 @@ fun TicketDetailScreen(ticketId: String, onBack: () -> Unit, onClosed: () -> Uni
                             context, Manifest.permission.ACCESS_FINE_LOCATION,
                         ) == PackageManager.PERMISSION_GRANTED
                         if (hasLocationPermission) {
+                            // Ya hay consentimiento de una captura anterior en esta orden: no
+                            // se repite el dialogo de consentimiento cada vez que se toca el
+                            // boton, solo la primera vez (antes de pedir el permiso del SO).
                             capturarUbicacion(context, viewModel)
                         } else {
-                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                            showLocationConsentDialog = true
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -382,7 +386,10 @@ fun TicketDetailScreen(ticketId: String, onBack: () -> Unit, onClosed: () -> Uni
                 confirmButton = {
                     Button(onClick = {
                         showConfirmCloseDialog = false
-                        viewModel.closeOnSite()
+                        val photoUri = uiState.evidencePhotoUri ?: return@Button
+                        val bytes = context.contentResolver.openInputStream(photoUri)?.use { it.readBytes() }
+                            ?: return@Button
+                        viewModel.closeOnSite(bytes)
                     }) {
                         Text("Sí, finalizar")
                     }
@@ -390,6 +397,40 @@ fun TicketDetailScreen(ticketId: String, onBack: () -> Unit, onClosed: () -> Uni
                 dismissButton = {
                     TextButton(onClick = { showConfirmCloseDialog = false }) {
                         Text("Revisar")
+                    }
+                },
+            )
+        }
+
+        // Consentimiento informado de ubicacion (Entregable 10 de la guia de cierre): el
+        // permiso de Android por si solo dice "que" se va a acceder, no "para que" ni "que se
+        // hace despues" con el dato -- una coordenada GPS atada a un tecnico identificado es
+        // un dato personal sensible (ver la Reflexion etica del manuscrito), asi que este
+        // dialogo explica el proposito y el destino del dato ANTES del permiso del sistema,
+        // no lo reemplaza: si el tecnico acepta aqui pero luego niega el permiso del SO, no se
+        // captura nada (ver locationPermissionLauncher).
+        if (showLocationConsentDialog) {
+            AlertDialog(
+                onDismissRequest = { showLocationConsentDialog = false },
+                title = { Text("Ubicación del cierre") },
+                text = {
+                    Text(
+                        "Al aceptar, se tomará tu ubicación GPS actual una sola vez y se guardará " +
+                            "junto a este ticket como evidencia de que el cierre se hizo en el sitio " +
+                            "del cliente. No se usa para rastrear tu posición en otro momento."
+                    )
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        showLocationConsentDialog = false
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    }) {
+                        Text("Aceptar y continuar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLocationConsentDialog = false }) {
+                        Text("Cancelar")
                     }
                 },
             )

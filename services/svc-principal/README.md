@@ -7,8 +7,11 @@ conectado por JDBC al cluster CockroachDB del proyecto (carpeta `db-cluster/` en
 
 1. Instalar extensiones: **Extension Pack for Java** y **Spring Boot Extension Pack**.
 2. Abrir esta carpeta (`services/svc-principal`) o el repo completo en VS Code.
-3. Levantar primero el cluster CockroachDB (ver `../../db-cluster/README.md`) y cargar el esquema
-   (`init_db.sql`, `zones.sql`, `seed_partitioned.sql`).
+3. Levantar primero el cluster CockroachDB (ver `../../db-cluster/README.md`), crear la base
+   vacía (`CREATE DATABASE IF NOT EXISTS ticket_db;`) y cargar `zones.sql` /
+   `seed_partitioned.sql` si hacen falta. El esquema de tablas (`db/migration/V1__init_ticket_schema.sql`)
+   ya no se carga a mano: lo aplica Flyway automáticamente al arrancar el servicio
+   (Entregable 5 de la guía de cierre).
 4. Correr `TicketServiceApplication.java` con el botón "Run" que aparece sobre el `main`, o:
    ```bash
    mvn spring-boot:run

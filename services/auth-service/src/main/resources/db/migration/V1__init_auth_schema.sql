@@ -1,12 +1,13 @@
--- init_auth_db.sql
--- Esquema para auth-service (equipo ACC — Soporte Tecnico ISP)
--- Ejecutar con: cockroach sql --insecure --host=localhost:26257 -f init_auth_db.sql
+-- V1__init_auth_schema.sql
+-- Esquema de auth-service (equipo ACC -- Soporte Tecnico ISP), aplicado por Flyway al
+-- arrancar el servicio. Reemplaza a db-cluster/scripts/init_auth_db.sql (Entregable 5 de la
+-- guia de cierre: aquel guion no era una migracion versionada, solo un script suelto que
+-- "db-init" corria contra el cluster). La base de datos "auth_db" en si la sigue creando
+-- "db-init" en docker-compose.yml, antes de que este servicio arranque -- Flyway conecta a una
+-- base que ya existe, no la crea.
 --
 -- Base de datos separada de ticket_db: cada microservicio es dueno de su propio esquema
--- (ver db-cluster/scripts/init_db.sql para el esquema de ticket-service).
-
-CREATE DATABASE IF NOT EXISTS auth_db;
-SET DATABASE = auth_db;
+-- (ver services/svc-principal/src/main/resources/db/migration/ para el de ticket-service).
 
 -- Usuarios del sistema. El id lo genera la aplicacion (Hibernate GenerationType.UUID,
 -- ver domain/User.java) antes del INSERT; el DEFAULT de aqui es solo un resguardo para

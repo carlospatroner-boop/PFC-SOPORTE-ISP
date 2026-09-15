@@ -14,13 +14,17 @@ consultas de agregación/reportería sin competir por recursos con la escritura 
 
 ## Cómo correrlo
 
-### 1. Esquema de base de datos
+### 1. Crear la base de datos vacía
 
 ```bash
 cd ../../db-cluster
-# usando el mismo patron que init_db.sql / init_auth_db.sql (ver README de db-cluster)
-docker exec -i roach1 cockroach sql --insecure < scripts/init_report_db.sql
+docker exec -i roach1 cockroach sql --insecure -e 'CREATE DATABASE IF NOT EXISTS report_db;'
 ```
+
+El esquema (la tabla `ticket_summary`) ya no se carga a mano: Flyway lo aplica
+automáticamente al arrancar el servicio, desde
+`src/main/resources/db/migration/V1__init_report_schema.sql` (Entregable 5 de la guía de
+cierre).
 
 ### 2. Infraestructura (Kafka, ya debe estar arriba para ticket-service/ai-service)
 

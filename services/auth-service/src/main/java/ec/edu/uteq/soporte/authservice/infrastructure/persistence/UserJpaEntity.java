@@ -20,7 +20,7 @@ import java.util.UUID;
 
 /**
  * Mapeo JPA real de User a la tabla `users` de la base `auth_db`
- * (ver db-cluster/scripts/init_auth_db.sql).
+ * (ver services/auth-service/src/main/resources/db/migration/V1__init_auth_schema.sql).
  *
  * A diferencia de `Ticket` en ticket-service, el id usa
  * {@code GenerationType.UUID}: Hibernate lo genera antes del insert sin que el

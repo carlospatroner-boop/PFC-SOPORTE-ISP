@@ -1,15 +1,16 @@
--- init_db.sql
--- Esquema distribuido para ticket-service (equipo ACC — Soporte Técnico ISP)
--- Ejecutar con: cockroach sql --insecure --host=localhost:26257 -f init_db.sql
+-- V1__init_ticket_schema.sql
+-- Esquema distribuido de ticket-service (equipo ACC -- Soporte Tecnico ISP), aplicado por
+-- Flyway al arrancar el servicio. Reemplaza a db-cluster/scripts/init_db.sql (Entregable 5 de
+-- la guia de cierre: aquel guion no era una migracion versionada, solo un script suelto que
+-- "db-init" corria contra el cluster). La base de datos "ticket_db" en si la sigue creando
+-- "db-init" en docker-compose.yml, antes de que este servicio arranque -- Flyway conecta a una
+-- base que ya existe, no la crea.
 
-CREATE DATABASE IF NOT EXISTS ticket_db;
-SET DATABASE = ticket_db;
-
--- Tabla de técnicos (dimensión pequeña, no particionada)
+-- Tabla de tecnicos (dimension pequena, no particionada)
 CREATE TABLE IF NOT EXISTS technicians (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name STRING NOT NULL,
-    zone STRING NOT NULL,          -- zona donde opera el técnico
+    zone STRING NOT NULL,          -- zona donde opera el tecnico
     specialty STRING,
     active BOOL DEFAULT TRUE
 );
@@ -74,7 +75,7 @@ CREATE TABLE IF NOT EXISTS incidencia_tickets (
 );
 
 -- Tabla de incidencias de red (telemetria), respaldo del reporte agregado que
--- produce el pipeline Spark (Paso 8 — integracion). No se carga aqui; la llena
+-- produce el pipeline Spark (Paso 8 -- integracion). No se carga aqui; la llena
 -- el job de Spark o un script de materializacion posterior.
 CREATE TABLE IF NOT EXISTS network_incidents_summary (
     zone                STRING NOT NULL,

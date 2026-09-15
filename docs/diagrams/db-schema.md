@@ -1,6 +1,7 @@
 # Esquema de `ticket_db` (CockroachDB, cluster de 3 nodos)
 
-Corresponde a `db-cluster/scripts/init_db.sql`. `tickets` es la tabla de mayor cardinalidad y la
+Corresponde a la migración Flyway `services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql`
+(Entregable 5 de la guía de cierre). `tickets` es la tabla de mayor cardinalidad y la
 única fragmentada (`PARTITION BY RANGE (created_at)`, ver
 [ADR-0003](../adr/0003-sharding-policy.md)); `technicians` es una dimensión pequeña sin
 particionar.
@@ -53,6 +54,8 @@ erDiagram
   de Spark (ver `spark/README.md`, sección de integración) — no se llena desde `ticket-service`,
   la llena un job de Spark o un script de materialización aparte.
 - El esquema completo de los otros 4 microservicios (`auth_db`, `report_db`, `ai_db`,
-  `notifications_db`) vive en sus propios scripts: `db-cluster/scripts/init_auth_db.sql`,
-  `db-cluster/scripts/init_report_db.sql`, y las colecciones de MongoDB documentadas en los
-  READMEs de `ai-service`/`notification-service` respectivamente.
+  `notifications_db`) vive en sus propias migraciones Flyway:
+  `services/auth-service/src/main/resources/db/migration/V1__init_auth_schema.sql`,
+  `services/report-service/src/main/resources/db/migration/V1__init_report_schema.sql`, y las
+  colecciones de MongoDB documentadas en los READMEs de `ai-service`/`notification-service`
+  respectivamente.

@@ -35,7 +35,8 @@ la tabla `tickets`, con 4 particiones trimestrales para 2026
 (`tickets_2026_q1`..`tickets_2026_q4`). La columna `created_at` pasa a ser el
 primer componente de la clave primaria compuesta `(created_at, id)` — requisito
 técnico de CockroachDB para que el particionamiento por rango sea efectivo (ver
-`db-cluster/scripts/init_db.sql`).
+`services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql`, migración
+Flyway versionada desde el Entregable 5 de la guía de cierre).
 
 Como `id` deja de ser autosuficiente como clave de acceso (la aplicación no conoce
 `created_at` de antemano cuando solo tiene el UUID del ticket), se añade un

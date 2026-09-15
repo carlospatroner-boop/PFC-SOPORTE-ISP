@@ -34,8 +34,9 @@ telemetría caído incluido) **nunca** revierte ni bloquea la creación del tick
 ya establecido para el *publish* de Kafka en ADR-0004.
 
 Persistencia: tablas nuevas `incidencias` + `incidencia_tickets` en `ticket_db` (ver
-`db-cluster/scripts/init_db.sql`), no particionadas — es una agrupación, no el registro de
-negocio principal, mismo criterio que la tabla `technicians`.
+`services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql`), no
+particionadas — es una agrupación, no el registro de negocio principal, mismo criterio que la
+tabla `technicians`.
 
 ## Escenario 4 del protocolo experimental (dos averías simultáneas)
 Ni `c1` ni `c2` están diseñadas para resolver el caso de dos averías reales golpeando la misma

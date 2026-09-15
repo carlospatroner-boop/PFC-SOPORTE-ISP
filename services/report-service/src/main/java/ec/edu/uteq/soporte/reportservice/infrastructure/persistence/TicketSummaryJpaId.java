@@ -10,7 +10,7 @@ import java.util.UUID;
 /**
  * Clave primaria compuesta (zone, ticketId) de TicketSummaryJpaEntity, requerida por
  * JPA (@IdClass) para reflejar PRIMARY KEY (zone, ticket_id) de
- * db-cluster/scripts/init_report_db.sql. Detalle puramente tecnico de JPA -- por eso
+ * services/report-service/src/main/resources/db/migration/V1__init_report_schema.sql. Detalle puramente tecnico de JPA -- por eso
  * vive en infrastructure/persistence y no en el dominio (a diferencia de la Entrega
  * anterior, donde vivia junto a la entidad en domain/).
  */

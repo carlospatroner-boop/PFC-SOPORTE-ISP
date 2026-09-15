@@ -97,7 +97,8 @@ CQRS &
   \texttt{UpdateTicketStatusHandler}); \texttt{report-service/application/ReportQueryService.java}
   concentra la lectura, sobre una proyección propia (\texttt{TicketSummary}) \\
 Fragmentación en CockroachDB &
-  \texttt{db-cluster/scripts/init\_*.sql} (esquema particionado real); decisión documentada en
+  \texttt{services/svc-principal/.../db/migration/V1\_\_init\_ticket\_schema.sql} (esquema
+  particionado real, migración Flyway versionada); decisión documentada en
   \texttt{docs/adr/0003-sharding-policy.md} \\
 Spark y ley de Amdahl &
   \texttt{spark/} (pipeline paralelo real); análisis en

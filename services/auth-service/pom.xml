@@ -84,6 +84,19 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Migraciones versionadas del esquema (Entregable 5 de la guia de cierre): antes el
+             esquema lo creaban guiones sueltos de db-cluster/scripts/, no versionados como
+             cambios: Flyway aplica db/migration/V1__*.sql automaticamente al arrancar,
+             contra la misma base que ya declara spring.datasource. CockroachDB v21.1+ es
+             compatible con Flyway 7.1+ (docs.cockroachlabs.com/docs/stable/flyway); se fija
+             la version en vez de heredar la que administra el padre de Spring Boot, para no
+             depender de que esa version en concreto siga soportando CockroachDB. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <version>9.22.3</version>
+        </dependency>
+
         <!-- Publica "technician.created" cuando se da de alta un usuario TECNICO, para que
              ticket-service sincronice su propia tabla technicians (misma Saga por
              coreografia que ya usan ticket-service/ai-service/notification-service, ver

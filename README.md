@@ -173,6 +173,9 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
 - Evidencia de tolerancia a fallos: `docs/evidencias/`
 - Paquete móvil firmado, listo para instalar: [`release/apk/`](release/apk/) — instrucciones de
   instalación y verificación en [`apps/mobile/README.md`](apps/mobile/README.md#paquete-instalable-releaseapk)
+- Entrega estable publicada (instalable firmado + manuscrito compilado, URL permanente que no
+  expira, actualizada en cada envío a `main` por el trabajo `build-mobile-apk`):
+  [GitHub Release `mobile-release`](../../releases/tag/mobile-release)
 - Capturas reales de la web y la app móvil: [`release/screenshots/`](release/screenshots/)
 - Declaración de uso de IA: [`ai-usage-declaration.md`](ai-usage-declaration.md)
 - Actas de reunión (reconstruidas a partir del chat real de coordinación del equipo, con fecha,

@@ -62,9 +62,11 @@ sitios: como artefacto descargable del propio *run* (`soporte-isp-release-firmad
 de retención — útil para depurar ese run puntual) y, además, como
 [GitHub Release](../../releases/tag/mobile-release) bajo el tag fijo `mobile-release`, que
 el mismo job actualiza en cada push a `main` — esa es la entrega estable: no expira y tiene URL
-permanente. Ya no es un paso manual. El `.jks` vive como secreto de GitHub Actions en base64
-(`ANDROID_KEYSTORE_BASE64`, con `ANDROID_KEYSTORE_PASSWORD` y `ANDROID_KEY_ALIAS`), nunca en el
-repositorio.
+permanente. Desde el Entregable 16 de la guía de cierre, ese release también incluye el
+manuscrito compilado (`main.pdf`, bajado del artefacto `manuscrito-pdf` que sube el job
+`compile-latex` del mismo *run*), no solo el instalable. Ya no es un paso manual. El `.jks` vive
+como secreto de GitHub Actions en base64 (`ANDROID_KEYSTORE_BASE64`, con
+`ANDROID_KEYSTORE_PASSWORD` y `ANDROID_KEY_ALIAS`), nunca en el repositorio.
 
 **Instalar en un dispositivo o emulador con depuración USB habilitada:**
 

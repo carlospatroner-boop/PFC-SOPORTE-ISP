@@ -50,6 +50,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * se traen explicitamente con @Import para que @Autowired TicketRepository resuelva al mismo
  * adaptador real que usa la aplicacion.
  *
+ * El esquema de "ticket_db" lo aplican las migraciones Flyway reales de
+ * db/migration/V1__init_ticket_schema.sql (Entregable 5 de la guia de cierre), no un arreglo
+ * de sentencias propio de esta clase -- si una migracion se rompe, esta prueba lo detecta.
+ *
  * Dos pruebas:
  *  1) Un roundtrip save/findByTicketId contra el CockroachDB real, a traves del puerto.
  *  2) Una prueba empirica de que el cluster aplica de verdad aislamiento SERIALIZABLE: dos
@@ -68,41 +72,6 @@ class TicketRepositoryIntegrationTest {
             .withExposedPorts(26257, 8080)
             .waitingFor(Wait.forHttp("/health?ready=1").forPort(8080).withStartupTimeout(Duration.ofSeconds(90)));
 
-    private static final String[] SCHEMA_STATEMENTS = {
-            """
-            CREATE TABLE IF NOT EXISTS technicians (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                full_name STRING NOT NULL,
-                zone STRING NOT NULL,
-                specialty STRING,
-                active BOOL DEFAULT TRUE
-            )
-            """,
-            // Mismo esquema que db-cluster/scripts/init_db.sql: PK (created_at, id)
-            // particionada por rango de fecha (ver ADR-0003) + indice unico sobre
-            // id para el punto de acceso real (findByTicketId).
-            """
-            CREATE TABLE IF NOT EXISTS tickets (
-                created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-                id              UUID NOT NULL DEFAULT gen_random_uuid(),
-                zone            STRING NOT NULL,
-                client_id       UUID NOT NULL,
-                technician_id   UUID REFERENCES technicians(id),
-                category        STRING,
-                priority        STRING,
-                status          STRING NOT NULL DEFAULT 'NUEVO',
-                description     STRING,
-                sla_deadline    TIMESTAMPTZ,
-                resolved_at     TIMESTAMPTZ,
-                sla_breached    BOOL DEFAULT FALSE,
-                PRIMARY KEY (created_at, id)
-            )
-            """,
-            "CREATE UNIQUE INDEX IF NOT EXISTS tickets_id_key ON tickets (id)",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_zone ON tickets (zone)",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status)",
-    };
-
     @DynamicPropertySource
     static void datasourceProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", TicketRepositoryIntegrationTest::jdbcUrl);
@@ -118,21 +87,19 @@ class TicketRepositoryIntegrationTest {
     // Corre antes de que Spring intente abrir el pool de conexiones (JUnit 5
     // ejecuta @BeforeAll estatico antes de instanciar el test, y ahi es donde el
     // TestContext framework de Spring evalua @DynamicPropertySource / crea el
-    // ApplicationContext) -- la base "ticket_db" y su esquema deben existir para
-    // ese momento, CockroachDB no la crea sola al conectar.
+    // ApplicationContext) -- la base "ticket_db" debe existir para ese momento,
+    // CockroachDB no la crea sola al conectar. El ESQUEMA ya no se crea aqui a mano
+    // (Entregable 5 de la guia de cierre: la prueba debe aplicar las migraciones reales,
+    // no su propio codigo de creacion) -- con flyway-core en el classpath, Spring Boot
+    // aplica automaticamente db/migration/V1__init_ticket_schema.sql contra esta misma
+    // base al levantar el ApplicationContext de @DataJpaTest.
     @BeforeAll
-    static void createDatabaseAndSchema() throws SQLException {
+    static void createDatabase() throws SQLException {
         String adminUrl = "jdbc:postgresql://%s:%d/defaultdb?sslmode=disable"
                 .formatted(cockroach.getHost(), cockroach.getMappedPort(26257));
         try (Connection conn = DriverManager.getConnection(adminUrl, "root", "");
              Statement st = conn.createStatement()) {
             st.execute("CREATE DATABASE IF NOT EXISTS ticket_db");
-        }
-        try (Connection conn = DriverManager.getConnection(jdbcUrl(), "root", "");
-             Statement st = conn.createStatement()) {
-            for (String ddl : SCHEMA_STATEMENTS) {
-                st.execute(ddl);
-            }
         }
     }
 

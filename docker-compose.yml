@@ -7,7 +7,8 @@
 #   (la primera vez tarda varios minutos: compila 5 microservicios Java + build de React)
 #
 # Que levanta, en orden de dependencia:
-#   1. Cluster CockroachDB (3 nodos) + init automatico de esquemas (servicio "db-init")
+#   1. Cluster CockroachDB (3 nodos) + creacion automatica de las bases vacias (servicio
+#      "db-init"); las tablas las crea Flyway dentro de cada servicio al arrancar
 #   2. Kafka + MongoDB (mensajeria para la saga de clasificacion de tickets)
 #   3. Los 5 microservicios de aplicacion (auth, ticket, ai, notification, report)
 #   4. El API Gateway (unico punto de entrada, puerto 8000)
@@ -122,9 +123,15 @@ services:
       retries: 15
       start_period: 60s
 
-  # Inicializa el cluster (una sola vez) y carga los esquemas -- reemplaza los pasos
+  # Inicializa el cluster (una sola vez) y crea las bases vacias -- reemplaza los pasos
   # manuales de "docker exec + docker cp" que hacia start-all.ps1, para que
-  # "docker compose up" solo, sin ningun script aparte, deje el sistema listo.
+  # "docker compose up" solo, sin ningun script aparte, deje el sistema listo. Ya NO carga
+  # el esquema de tablas ni la politica de zonas: eso lo hace Flyway dentro de cada servicio
+  # al arrancar, contra las migraciones versionadas de db/migration/ (Entregable 5 de la guia
+  # de cierre -- antes lo hacian los guiones sueltos de db-cluster/scripts/ y
+  # db-cluster/config/zones.sql, sin versionar como cambios, y "zones.sql" ni siquiera podia
+  # correr aqui de forma fiable: ALTER TABLE tickets exige que la tabla ya exista, y ese
+  # momento ahora lo decide Flyway dentro de ticket-service, no este contenedor).
   db-init:
     image: cockroachdb/cockroach:latest-v23.2
     container_name: db-init
@@ -132,9 +139,6 @@ services:
       roach1: { condition: service_healthy }
       roach2: { condition: service_healthy }
       roach3: { condition: service_healthy }
-    volumes:
-      - ./db-cluster/scripts:/scripts:ro
-      - ./db-cluster/config:/config:ro
     networks: [soporte-net]
     entrypoint: ["/bin/bash", "-c"]
     command: >
@@ -149,12 +153,10 @@ services:
          echo \"db-init: el cluster aun no acepta conexiones SQL (intento $$i), reintentando en 2s\";
          sleep 2;
        done &&
-       cockroach sql --insecure --host=roach1 -f /scripts/init_db.sql &&
-       cockroach sql --insecure --host=roach1 -f /config/zones.sql &&
-       cockroach sql --insecure --host=roach1 -f /scripts/init_auth_db.sql &&
-       cockroach sql --insecure --host=roach1 -e 'ALTER TABLE auth_db.users ADD COLUMN IF NOT EXISTS zone STRING;' &&
-       cockroach sql --insecure --host=roach1 -f /scripts/init_report_db.sql &&
-       echo 'db-init: esquemas listos'"
+       cockroach sql --insecure --host=roach1 -e 'CREATE DATABASE IF NOT EXISTS ticket_db;' &&
+       cockroach sql --insecure --host=roach1 -e 'CREATE DATABASE IF NOT EXISTS auth_db;' &&
+       cockroach sql --insecure --host=roach1 -e 'CREATE DATABASE IF NOT EXISTS report_db;' &&
+       echo 'db-init: bases creadas -- cada servicio aplica sus propias migraciones Flyway al arrancar (Entregable 5)'"
     restart: "no"
 
   # ============================================================

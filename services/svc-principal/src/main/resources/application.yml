@@ -14,8 +14,8 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    # El esquema (incluyendo PARTITION BY) ya lo gestionan los scripts de db-cluster/scripts/.
-    # Hibernate NUNCA debe recrear ni alterar la tabla particionada.
+    # El esquema (incluyendo PARTITION BY) ya lo gestiona Flyway (db/migration/, Entregable 5
+    # de la guia de cierre). Hibernate NUNCA debe recrear ni alterar la tabla particionada.
     hibernate:
       ddl-auto: none
     show-sql: true

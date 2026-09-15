@@ -6,7 +6,7 @@ spring:
     name: report-service
 
   datasource:
-    # Base propia report_db (ver db-cluster/scripts/init_report_db.sql), en el mismo
+    # Base propia report_db (ver services/report-service/src/main/resources/db/migration/V1__init_report_schema.sql), en el mismo
     # cluster CockroachDB que el resto de servicios.
     url: ${DB_URL:jdbc:postgresql://localhost:26257/report_db?sslmode=disable}
     username: ${DB_USER:root}
@@ -14,7 +14,8 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    # El esquema lo gestiona init_report_db.sql -- Hibernate nunca crea/altera la tabla.
+    # El esquema lo gestiona Flyway (db/migration/, Entregable 5 de la guia de cierre) --
+    # Hibernate nunca crea/altera la tabla.
     hibernate:
       ddl-auto: none
     show-sql: true

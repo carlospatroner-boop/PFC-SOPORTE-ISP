@@ -149,8 +149,9 @@ build-mobile-apk, integration): [`.github/workflows/ci-cd.yml`](.github/workflow
   congelada de esta entrega: un PDF fechado y atado a un commit exacto (`50024c4`, 2026-09-15) que
   no se vuelve a recompilar ni a sobrescribir, para poder citar una versión verificable en vez de
   "el PDF de hoy".
-- Esquema de base de datos consolidado (referencia de lectura; los scripts que realmente se
-  ejecutan siguen en `db-cluster/scripts/`): [`docs/db/schema.sql`](docs/db/schema.sql)
+- Esquema de base de datos consolidado (referencia de lectura; las migraciones Flyway
+  versionadas que realmente se ejecutan siguen en `db/migration/` de cada servicio con
+  persistencia — auth-service, report-service, svc-principal): [`docs/db/schema.sql`](docs/db/schema.sql)
 - Puntos de entrada documentados a las pruebas de integración, E2E y contrato (el código real
   vive junto a cada módulo, no se duplica aquí): [`tests/`](tests/)
 - Protocolo y resultados experimentales (Spark, Entrega 3): [`docs/experimentos/protocolo.md`](docs/experimentos/protocolo.md)

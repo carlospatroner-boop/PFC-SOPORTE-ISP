@@ -14,8 +14,8 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    # El esquema ya lo gestiona db-cluster/scripts/init_auth_db.sql.
-    # Hibernate NUNCA debe recrear ni alterar las tablas de este servicio.
+    # El esquema ya lo gestiona Flyway (db/migration/V1__init_auth_schema.sql, Entregable 5 de
+    # la guia de cierre). Hibernate NUNCA debe recrear ni alterar las tablas de este servicio.
     hibernate:
       ddl-auto: none
     show-sql: true

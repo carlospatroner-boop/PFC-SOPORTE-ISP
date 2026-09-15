@@ -12,8 +12,14 @@ Verificar en la consola web que los 3 nodos aparecen `live`: http://localhost:80
 
 ## Cargar el esquema
 
+Desde el Entregable 5 de la guía de cierre, el esquema de `ticket_db` es una migración Flyway
+versionada (`services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql`),
+no un guion suelto de esta carpeta — normalmente la aplica el propio `ticket-service` al
+arrancar. Para las pruebas manuales de este archivo (cluster levantado aparte, sin los
+microservicios), se carga el mismo archivo de migración directamente:
+
 ```bash
-cockroach sql --insecure --host=localhost:26257 -f scripts/init_db.sql
+cockroach sql --insecure --host=localhost:26257 -f ../services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql
 cockroach sql --insecure --host=localhost:26257 -f config/zones.sql
 cockroach sql --insecure --host=localhost:26257 -f scripts/seed_partitioned.sql
 ```
@@ -52,7 +58,7 @@ cockroach sql --insecure --host=localhost:26257 -f scripts/queries_bench.sql > r
 
 # Nodo único para comparar
 cockroach start-single-node --insecure --listen-addr=localhost:26260 --http-addr=localhost:8090 &
-cockroach sql --insecure --host=localhost:26260 -f scripts/init_db.sql
+cockroach sql --insecure --host=localhost:26260 -f ../services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql
 cockroach sql --insecure --host=localhost:26260 -f scripts/seed_partitioned.sql
 cockroach sql --insecure --host=localhost:26260 -f scripts/queries_bench.sql > results_single_node.txt
 ```

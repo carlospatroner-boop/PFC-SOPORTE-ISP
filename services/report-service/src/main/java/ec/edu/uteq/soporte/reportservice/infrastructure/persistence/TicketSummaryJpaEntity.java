@@ -16,7 +16,7 @@ import java.util.UUID;
 
 /**
  * Mapeo JPA real de TicketSummary a `ticket_summary` en la base report_db propia de
- * este servicio (ver db-cluster/scripts/init_report_db.sql).
+ * este servicio (ver services/report-service/src/main/resources/db/migration/V1__init_report_schema.sql).
  */
 @Entity
 @Table(name = "ticket_summary")

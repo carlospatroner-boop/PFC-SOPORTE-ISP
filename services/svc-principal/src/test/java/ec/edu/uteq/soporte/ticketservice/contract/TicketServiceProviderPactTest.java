@@ -124,7 +124,7 @@ class TicketServiceProviderPactTest {
 
             // No se usa UPSERT aqui: UPSERT solo resuelve conflictos contra la PRIMARY KEY
             // (created_at, id), pero "id" tiene ADEMAS un indice unico propio,
-            // "tickets_id_key" (ver db-cluster/scripts/init_db.sql), que UPSERT no
+            // "tickets_id_key" (ver services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql), que UPSERT no
             // considera. Si el ticket ya existe (por ejemplo, quedo de una corrida
             // anterior de esta misma prueba, o de la vieja data de demo semi-perdida que
             // origino este arreglo), un UPSERT con un valor de created_at distinto

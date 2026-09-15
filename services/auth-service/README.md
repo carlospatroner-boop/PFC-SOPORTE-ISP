@@ -14,13 +14,17 @@ CockroachDB del proyecto (carpeta `db-cluster/` en la raiz del repo).
 
 ## Cómo correrlo
 
-### 1. Cargar el esquema
+### 1. Crear la base de datos vacía
 
 Con el cluster de `db-cluster/` ya levantado (ver `../../db-cluster/README.md`):
 
 ```bash
-cockroach sql --insecure --host=localhost:26257 -f ../../db-cluster/scripts/init_auth_db.sql
+cockroach sql --insecure --host=localhost:26257 -e 'CREATE DATABASE IF NOT EXISTS auth_db;'
 ```
+
+El esquema (tablas, índices) ya no se carga a mano: Flyway lo aplica automáticamente al
+arrancar el servicio, desde `src/main/resources/db/migration/V1__init_auth_schema.sql`
+(Entregable 5 de la guía de cierre).
 
 ### 2a. Localmente (VS Code / mvn)
 

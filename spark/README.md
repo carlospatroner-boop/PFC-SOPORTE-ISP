@@ -98,8 +98,9 @@ jupyter nbconvert --to html notebooks/spark_pipeline.ipynb
 
 El resultado de `t4_recurrence_flag` (reincidencia) o `t5_cluster_by_text_and_zone` (clustering)
 puede escribirse como tabla en CockroachDB usando el conector JDBC de Spark (la tabla destino debe
-ajustar su esquema a las columnas de cada DataFrame -- `network_incidents_summary`, en
-`db-cluster/scripts/init_db.sql`, quedó pensada para el pipeline anterior de MTTR por hora/zona y
+ajustar su esquema a las columnas de cada DataFrame -- `network_incidents_summary`, definida en
+`services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql`, quedó
+pensada para el pipeline anterior de MTTR por hora/zona y
 necesitaría una migración de esquema si se quiere reutilizar para reincidencia/clustering):
 
 ```python

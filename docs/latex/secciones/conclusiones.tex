@@ -46,8 +46,10 @@ producido en E3 debe reutilizarse, ampliarse o instrumentarse en E4, no descarta
 siguientes artefactos quedan disponibles para consumo directo en el siguiente ciclo:
 
 \begin{itemize}[leftmargin=1.5em]
-    \item \textbf{El esquema de base de datos fragmentado} (\texttt{db-cluster/scripts/init\_db.sql},
-        ADR-0003) y el propio \textbf{clúster de tres nodos de CockroachDB} quedan como la capa de
+    \item \textbf{El esquema de base de datos fragmentado} (migración Flyway versionada
+        \texttt{V1\_\_init\_ticket\_schema.sql} desde el Entregable 5 de la guía de cierre,
+        antes un guion suelto sin versionar; ADR-0003) y el propio \textbf{clúster de tres
+        nodos de CockroachDB} quedan como la capa de
         persistencia definitiva del sistema: E4 no necesita rediseñar ni migrar datos, solo construir
         sobre ella la interfaz web, la interfaz móvil y la observabilidad exigidas en el siguiente
         ciclo.

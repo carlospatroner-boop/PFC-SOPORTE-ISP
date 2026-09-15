@@ -2,26 +2,27 @@
 -- docs/db/schema.sql
 -- Esquema desplegado del sistema (equipo ACC — Soporte Técnico ISP), consolidado
 -- en un solo archivo por conveniencia de lectura. Este archivo NO se ejecuta —
--- es una copia textual, sin cambios, de los tres scripts reales que sí se
--- ejecutan y que siguen siendo la fuente de verdad:
---   - db-cluster/scripts/init_db.sql       (ticket_db, usado por ticket-service)
---   - db-cluster/scripts/init_auth_db.sql  (auth_db, usado por auth-service)
---   - db-cluster/scripts/init_report_db.sql (report_db, usado por report-service,
---                                             lado de lectura del CQRS)
--- Ver db-cluster/scripts/ para los que realmente corre "db-init" al levantar el
--- stack (docker-compose.yml), y docs/adr/0003-sharding-policy.md /
--- docs/adr/0008-correl-incidencias.md para la justificación de diseño de
--- "tickets" (particionada por fecha_apertura) e "incidencias" (agrupación de
--- tickets por avería, CORREL) respectivamente.
+-- es una copia textual, sin cambios, de las tres migraciones Flyway versionadas
+-- que sí se ejecutan y que siguen siendo la fuente de verdad (Entregable 5 de la
+-- guía de cierre; antes eran guiones sueltos de db-cluster/scripts/, no
+-- versionados como cambios):
+--   - services/svc-principal/src/main/resources/db/migration/V1__init_ticket_schema.sql
+--     (ticket_db, aplicado por ticket-service al arrancar)
+--   - services/auth-service/src/main/resources/db/migration/V1__init_auth_schema.sql
+--     (auth_db, aplicado por auth-service al arrancar)
+--   - services/report-service/src/main/resources/db/migration/V1__init_report_schema.sql
+--     (report_db, aplicado por report-service al arrancar, lado de lectura del CQRS)
+-- La base de datos en sí (CREATE DATABASE) la sigue creando "db-init" en
+-- docker-compose.yml antes de que cada servicio arranque; Flyway conecta a una base
+-- que ya existe. Ver docs/adr/0003-sharding-policy.md / docs/adr/0008-correl-incidencias.md
+-- para la justificación de diseño de "tickets" (particionada por fecha_apertura) e
+-- "incidencias" (agrupación de tickets por avería, CORREL) respectivamente.
 -- ============================================================================
 
 
 -- ============================================================
--- ticket_db — db-cluster/scripts/init_db.sql
+-- ticket_db — services/svc-principal/.../db/migration/V1__init_ticket_schema.sql
 -- ============================================================
-
-CREATE DATABASE IF NOT EXISTS ticket_db;
-SET DATABASE = ticket_db;
 
 -- Tabla de técnicos (dimensión pequeña, no particionada)
 CREATE TABLE IF NOT EXISTS technicians (
@@ -106,11 +107,8 @@ CREATE TABLE IF NOT EXISTS network_incidents_summary (
 
 
 -- ============================================================
--- auth_db — db-cluster/scripts/init_auth_db.sql
+-- auth_db — services/auth-service/.../db/migration/V1__init_auth_schema.sql
 -- ============================================================
-
-CREATE DATABASE IF NOT EXISTS auth_db;
-SET DATABASE = auth_db;
 
 -- Usuarios del sistema. El id lo genera la aplicacion (Hibernate GenerationType.UUID,
 -- ver domain/User.java) antes del INSERT; el DEFAULT de aqui es solo un resguardo para
@@ -149,7 +147,7 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id
 
 
 -- ============================================================
--- report_db — db-cluster/scripts/init_report_db.sql
+-- report_db — services/report-service/.../db/migration/V1__init_report_schema.sql
 -- ============================================================
 
 -- Base de datos propia de report-service (lado de lectura del CQRS), equipo ACC.
@@ -158,9 +156,6 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id
 -- ticket.status-changed, ticket.assigned) -- ver config/ReportEventListener.java.
 -- Completamente desacoplada de ticket_db.tickets: report-service nunca la consulta
 -- ni depende de su esquema, solo de los eventos publicos.
-
-CREATE DATABASE IF NOT EXISTS report_db;
-SET DATABASE = report_db;
 
 CREATE TABLE IF NOT EXISTS ticket_summary (
     zone           STRING NOT NULL,
